@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "AI Browser Automation Platform",
+  "version": "1.0.0",
+  "description": "Secure Edge Extension AI Browser Automation Bridge",
+  "permissions": [
+    "sidePanel",
+    "storage",
+    "scripting",
+    "tabs",
+    "activeTab",
+    "proxy",
+    "debugger",
+    "tabGroups"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "index.html"
+  },
+  "action": {
+    "default_title": "Open Automation Panel"
+  },
+  "host_permissions": [
+    "<all_urls>"
+  ]
+}

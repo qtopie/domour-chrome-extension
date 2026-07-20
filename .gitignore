@@ -1,0 +1,19 @@
+# Compiles binaries
+bin/
+*.exe
+*.test
+*.prof
+
+# Frontend dependencies and builds
+frontend/node_modules/
+frontend/dist/
+frontend/.svelte-kit/
+frontend/.next/
+frontend/out/
+
+# Chrome runtime environment
+.chrome-profile/
+
+# Logs
+*.log
+bridge.log

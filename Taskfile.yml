@@ -1,0 +1,92 @@
+version: '3'
+
+tasks:
+  default:
+    desc: Build all components (Go backend and React frontend)
+    cmds:
+      - task: backend:build
+      - task: frontend:build
+
+  backend:build:
+    desc: Compile the Go bridge daemon and the CLI helper tool
+    cmds:
+      - go mod tidy
+      - mkdir -p bin
+      - go build -o bin/bridge main.go
+      - go build -o bin/bridge-cli cmd/main.go
+    sources:
+      - main.go
+      - cmd/**/*.go
+    generates:
+      - bin/bridge
+      - bin/bridge-cli
+
+  frontend:install:
+    desc: Install React side panel packages
+    dir: frontend
+    cmds:
+      - npm install
+
+  frontend:build:
+    desc: Build the production bundle for the React extension side panel
+    dir: frontend
+    cmds:
+      - npm run build
+    sources:
+      - frontend/src/**/*
+      - frontend/public/**/*
+      - frontend/package.json
+      - frontend/vite.config.ts
+    generates:
+      - frontend/dist/**/*
+
+  frontend:dev:
+    desc: Start Vite dev server for frontend side panel development
+    dir: frontend
+    cmds:
+      - npm run dev
+
+  register:
+    desc: "Register the Native Messaging Host configuration with Microsoft Edge (Usage: task register -- <EXTENSION_ID>)"
+    cmds:
+      - ./register_host.sh {{.CLI_ARGS}}
+    preconditions:
+      - sh: test -f bin/bridge
+        msg: "Please build the backend first: task backend:build"
+
+  browser:launch:
+    desc: Launch Microsoft Edge with the unpacked extension pre-loaded in an isolated profile
+    deps: [frontend:build]
+    cmds:
+      - |
+        EDGE_BIN=""
+        for cmd in microsoft-edge microsoft-edge-stable microsoft-edge-dev microsoft-edge-beta; do
+          if command -v $cmd &> /dev/null; then
+            EDGE_BIN=$cmd
+            break
+          fi
+        done
+        if [ -z "$EDGE_BIN" ]; then
+          echo "Error: Microsoft Edge was not found on your system."
+          exit 1
+        fi
+        echo "Launching Microsoft Edge with the extension loaded..."
+        $EDGE_BIN \
+          --load-extension="$(pwd)/frontend/dist" \
+          --user-data-dir="$(pwd)/.edge-profile" \
+          --no-first-run \
+          --no-default-browser-check
+
+  clean:
+    desc: Clean build artifacts, compiled binaries, and runtime log files
+    cmds:
+      - rm -rf bin/
+      - rm -rf frontend/dist/
+      - rm -rf .edge-profile/
+      - rm -f bridge.log
+      - rm -f {{.TEMP_DIR}}/browser_job.json
+      - rm -f {{.TEMP_DIR}}/browser_response.json
+    vars:
+      TEMP_DIR:
+        sh: go env GOTMPDIR || echo "/tmp"
+
