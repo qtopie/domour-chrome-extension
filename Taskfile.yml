@@ -8,18 +8,18 @@ tasks:
       - task: frontend:build
 
   backend:build:
-    desc: Compile the Go bridge daemon and the CLI helper tool
+    desc: Compile the Go bridge daemon and CLI tool
     cmds:
       - go mod tidy
       - mkdir -p bin
-      - go build -o bin/bridge main.go
-      - go build -o bin/bridge-cli cmd/main.go
+      - go build -o bin/domour-chrome-bridge main.go
+      - go build -o bin/domour-chrome-cli cmd/main.go
     sources:
       - main.go
       - cmd/**/*.go
     generates:
-      - bin/bridge
-      - bin/bridge-cli
+      - bin/domour-chrome-bridge
+      - bin/domour-chrome-cli
 
   frontend:install:
     desc: Install React side panel packages
@@ -51,7 +51,7 @@ tasks:
     cmds:
       - ./register_host.sh {{.CLI_ARGS}}
     preconditions:
-      - sh: test -f bin/bridge
+      - sh: test -f bin/domour-chrome-bridge
         msg: "Please build the backend first: task backend:build"
 
   browser:launch:
@@ -60,18 +60,58 @@ tasks:
     cmds:
       - |
         EDGE_BIN=""
-        for cmd in microsoft-edge microsoft-edge-stable microsoft-edge-dev microsoft-edge-beta; do
-          if command -v $cmd &> /dev/null; then
-            EDGE_BIN=$cmd
-            break
+        OS_TYPE="$(uname -s 2>/dev/null || echo "Unknown")"
+
+        if [[ "$OS_TYPE" == "Darwin" ]]; then
+          EDGE_PATHS=(
+            "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"
+            "/Applications/Microsoft Edge Canary.app/Contents/MacOS/Microsoft Edge Canary"
+            "/Applications/Microsoft Edge Dev.app/Contents/MacOS/Microsoft Edge Dev"
+            "/Applications/Microsoft Edge Beta.app/Contents/MacOS/Microsoft Edge Beta"
+          )
+          for p in "${EDGE_PATHS[@]}"; do
+            if [ -x "$p" ]; then
+              EDGE_BIN="$p"
+              break
+            fi
+          done
+        elif [[ "$OS_TYPE" == "Linux" ]]; then
+          for cmd in microsoft-edge microsoft-edge-stable microsoft-edge-dev microsoft-edge-beta; do
+            if command -v $cmd &> /dev/null; then
+              EDGE_BIN=$cmd
+              break
+            fi
+          done
+        else
+          # Windows (Git Bash / MSYS / CYGWIN) or fallback PATH lookups
+          for cmd in microsoft-edge msedge msedge.exe microsoft-edge-stable; do
+            if command -v $cmd &> /dev/null; then
+              EDGE_BIN=$cmd
+              break
+            fi
+          done
+          if [ -z "$EDGE_BIN" ]; then
+            WIN_PATHS=(
+              "/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
+              "/c/Program Files/Microsoft/Edge/Application/msedge.exe"
+              "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
+              "C:/Program Files/Microsoft/Edge/Application/msedge.exe"
+            )
+            for p in "${WIN_PATHS[@]}"; do
+              if [ -f "$p" ]; then
+                EDGE_BIN="$p"
+                break
+              fi
+            done
           fi
-        done
+        fi
+
         if [ -z "$EDGE_BIN" ]; then
-          echo "Error: Microsoft Edge was not found on your system."
+          echo "Error: Microsoft Edge was not found on your system ($OS_TYPE)."
           exit 1
         fi
         echo "Launching Microsoft Edge with the extension loaded..."
-        $EDGE_BIN \
+        "$EDGE_BIN" \
           --load-extension="$(pwd)/frontend/dist" \
           --user-data-dir="$(pwd)/.edge-profile" \
           --no-first-run \

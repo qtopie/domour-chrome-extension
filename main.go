@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
@@ -24,14 +25,14 @@ type ChromeMessage struct {
 	Msg    string `json:"message,omitempty"`
 }
 
-// Job defines the format of the job payload received in the temp directory
+// Job defines the format of the job payload
 type Job struct {
 	Token  string `json:"token"`
 	Action string `json:"action"`
 	URL    string `json:"url"`
 }
 
-// VproxyProfilePayload defines proxy profile format from vproxy config
+// VproxyProfilePayload defines proxy profile format
 type VproxyProfilePayload struct {
 	ID         string   `json:"id,omitempty"`
 	Name       string   `json:"name"`
@@ -46,26 +47,53 @@ type VproxyProfilePayload struct {
 	Color      string   `json:"color,omitempty"`
 }
 
-// VproxySyncFile defines the payload written to vproxy_sync.json
 type VproxySyncFile struct {
 	Token        string                 `json:"token,omitempty"`
 	Profiles     []VproxyProfilePayload `json:"profiles"`
 	AutoSelectID string                 `json:"autoSelectId,omitempty"`
 }
 
+// MCP JSON-RPC Protocol Structs
+type JSONRPCRequest struct {
+	JSONRPC string          `json:"jsonrpc"`
+	ID      interface{}     `json:"id"`
+	Method  string          `json:"method"`
+	Params  json.RawMessage `json:"params,omitempty"`
+}
+
+type JSONRPCResponse struct {
+	JSONRPC string      `json:"jsonrpc"`
+	ID      interface{} `json:"id"`
+	Result  interface{} `json:"result,omitempty"`
+	Error   interface{} `json:"error,omitempty"`
+}
+
+type MCPTool struct {
+	Name        string      `json:"name"`
+	Description string      `json:"description"`
+	InputSchema interface{} `json:"inputSchema"`
+}
+
+type CallToolParams struct {
+	Name      string                 `json:"name"`
+	Arguments map[string]interface{} `json:"arguments"`
+}
+
 var (
-	validToken string
-	tokenLock  sync.RWMutex
-	writeMu    sync.Mutex
-	logFile    *os.File
+	validToken       string
+	tokenLock        sync.RWMutex
+	writeMu          sync.Mutex
+	logFile          *os.File
+	pendingResponseMu sync.Mutex
+	pendingResponseChan chan ChromeMessage
 )
 
 func main() {
-	// Set up logging to a file in the project folder to avoid polluting stdout
+	pendingResponseChan = make(chan ChromeMessage, 10)
+
 	var err error
 	logFile, err = os.OpenFile("bridge.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
-		// Failback to stderr since Chrome captures it anyway
 		log.SetOutput(os.Stderr)
 	} else {
 		defer logFile.Close()
@@ -74,8 +102,7 @@ func main() {
 
 	log.Println("Bridge started. Waiting for INITIAL_AUTH on Stdin...")
 
-	// 1. Initial Authentication Phase (Zero-Trust Blocked State)
-	// We strictly process stdin until we get a valid INITIAL_AUTH message containing the token.
+	// 1. Initial Authentication Phase
 	for {
 		msgBytes, err := readMessage(os.Stdin)
 		if err != nil {
@@ -84,41 +111,40 @@ func main() {
 
 		var msg ChromeMessage
 		if err := json.Unmarshal(msgBytes, &msg); err != nil {
-			log.Printf("Failed to parse initial auth message: %v. Raw: %s", err, string(msgBytes))
+			log.Printf("Failed to parse initial auth message: %v", err)
 			continue
 		}
 
 		if msg.Type == "INITIAL_AUTH" {
 			if msg.Token == "" {
-				log.Println("Received INITIAL_AUTH with empty token. Refusing authorization.")
+				log.Println("Received INITIAL_AUTH with empty token.")
 				continue
 			}
 			tokenLock.Lock()
 			validToken = msg.Token
 			tokenLock.Unlock()
 			log.Printf("Successfully authenticated. Token locked: %s", msg.Token)
-			
-			// Send a log feedback packet to Chrome confirming success
 			sendSystemLog("info", "Bridge authenticated and token locked.")
 			break
-		} else {
-			log.Printf("Received non-auth message %q before authentication. Ignored.", msg.Type)
 		}
 	}
 
-	// 2. Start Keep-Alive Heartbeat (every 20 seconds) to prevent MV3 shutdown
+	// 2. Start Keep-Alive Heartbeat
 	go startHeartbeat()
 
-	// 3. Start Polling for browser_job.json & vproxy_sync.json
+	// 3. Start Polling for legacy file jobs & vproxy sync
 	go startFilePolling()
 	go startVproxyPolling()
 
-	// 4. Main Event Loop: Read and handle standard messages from Chrome background service worker
+	// 4. Embedded Streamable HTTP MCP Server
+	go startEmbeddedMCPServer(6888)
+
+	// 5. Main Event Loop: Native Messaging Pipe Reader
 	for {
 		msgBytes, err := readMessage(os.Stdin)
 		if err != nil {
 			if err == io.EOF {
-				log.Println("Edge closed connection. Exiting bridge.")
+				log.Println("Chrome closed connection. Exiting bridge.")
 				break
 			}
 			log.Printf("Error reading message: %v", err)
@@ -131,20 +157,300 @@ func main() {
 			continue
 		}
 
-		log.Printf("Received message from Edge: Type=%s, Status=%s", msg.Type, msg.Status)
-
 		if msg.Type == "JOB_RESPONSE" {
-			log.Printf("Job response received. URL=%s, Status=%s, Data length=%d", msg.URL, msg.Status, len(msg.Data))
+			log.Printf("Job response received. URL=%s, Status=%s", msg.URL, msg.Status)
+			// Write response to file for CLI
 			writeJobResponse(msg)
+			// Non-blocking dispatch to MCP channel
+			select {
+			case pendingResponseChan <- msg:
+			default:
+			}
 		} else if msg.Type == "TRIGGER_VPROXY_SYNC" {
-			log.Println("Manual VPROXY sync triggered from React UI.")
-			sendSystemLog("system", "VProxy manual sync requested from Side Panel.")
 			triggerVproxyScan()
 		}
 	}
 }
 
-// readMessage reads a 4-byte little-endian header indicating payload length, then the payload itself.
+// Memory Job Dispatcher directly sends payload to Chrome via Native Pipe
+func dispatchJobToBrowser(action, targetURL string) (ChromeMessage, error) {
+	tokenLock.RLock()
+	currentValidToken := validToken
+	tokenLock.RUnlock()
+
+	jobPayload := map[string]string{
+		"type":   "JOB_REQUEST",
+		"token":  currentValidToken,
+		"action": action,
+		"url":    targetURL,
+	}
+	payloadBytes, err := json.Marshal(jobPayload)
+	if err != nil {
+		return ChromeMessage{}, err
+	}
+
+	log.Printf("Dispatching in-memory job to Chrome: Action=%s, URL=%s", action, targetURL)
+	sendSystemLog("info", "Executing memory MCP job. Action: %s, URL: %s", action, targetURL)
+
+	if err := writeMessage(os.Stdout, payloadBytes); err != nil {
+		return ChromeMessage{}, fmt.Errorf("failed to write message to Chrome pipe: %v", err)
+	}
+
+	// Wait for response on internal channel with 15s timeout
+	select {
+	case res := <-pendingResponseChan:
+		return res, nil
+	case <-time.After(15 * time.Second):
+		return ChromeMessage{}, fmt.Errorf("timeout waiting for Chrome extension execution")
+	}
+}
+
+// Embedded Streamable HTTP MCP Server (/mcp)
+func startEmbeddedMCPServer(port int) {
+	http.HandleFunc("/mcp", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+		if r.Method == "OPTIONS" {
+			return
+		}
+
+		if r.Method == "POST" {
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+
+			resp := processJSONRPC(body)
+			if resp != nil {
+				w.Header().Set("Content-Type", "application/json")
+				w.Write(resp)
+			}
+			return
+		}
+
+		if r.Method == "GET" {
+			w.Header().Set("Content-Type", "text/event-stream")
+			w.Header().Set("Cache-Control", "no-cache")
+			w.Header().Set("Connection", "keep-alive")
+
+			flusher, ok := w.(http.Flusher)
+			if !ok {
+				http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
+				return
+			}
+
+			fmt.Fprintf(w, "event: endpoint\ndata: /mcp\n\n")
+			flusher.Flush()
+			select {}
+		}
+	})
+
+	log.Printf("Embedded Streamable HTTP MCP Server started on http://localhost:%d/mcp", port)
+	_ = http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
+}
+
+func getToolsList() []MCPTool {
+	return []MCPTool{
+		{
+			Name:        "browser_navigate",
+			Description: "Navigate browser to a target URL and return title, inner text, and page metrics.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"url": map[string]interface{}{
+						"type":        "string",
+						"description": "The web URL to open and scrape",
+					},
+				},
+				"required": []string{"url"},
+			},
+		},
+		{
+			Name:        "browser_get_cookies",
+			Description: "Extract authentication cookies (e.g. for leetcode.com) from authentic browser session.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"domain": map[string]interface{}{
+						"type":        "string",
+						"description": "Domain or URL to fetch cookies for (e.g. leetcode.com)",
+					},
+				},
+				"required": []string{"domain"},
+			},
+		},
+		{
+			Name:        "browser_take_screenshot",
+			Description: "Take a screenshot of a target URL and return it as a native MCP image node (image/png) for low-token Vision AI processing.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"url": map[string]interface{}{
+						"type":        "string",
+						"description": "Target Web URL to capture screenshot",
+					},
+				},
+				"required": []string{"url"},
+			},
+		},
+	}
+}
+
+func handleCallTool(params CallToolParams) (interface{}, error) {
+	switch params.Name {
+	case "browser_navigate":
+		targetURL, _ := params.Arguments["url"].(string)
+		if targetURL == "" {
+			return nil, fmt.Errorf("missing 'url' argument")
+		}
+		resMsg, err := dispatchJobToBrowser("OPEN_AND_AUTOMATE", targetURL)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]interface{}{
+			"content": []map[string]interface{}{
+				{
+					"type": "text",
+					"text": resMsg.Data,
+				},
+			},
+		}, nil
+
+	case "browser_get_cookies":
+		domain, _ := params.Arguments["domain"].(string)
+		if domain == "" {
+			return nil, fmt.Errorf("missing 'domain' argument")
+		}
+		resMsg, err := dispatchJobToBrowser("GET_COOKIES", domain)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]interface{}{
+			"content": []map[string]interface{}{
+				{
+					"type": "text",
+					"text": resMsg.Data,
+				},
+			},
+		}, nil
+
+	case "browser_take_screenshot":
+		targetURL, _ := params.Arguments["url"].(string)
+		if targetURL == "" {
+			return nil, fmt.Errorf("missing 'url' argument")
+		}
+		resMsg, err := dispatchJobToBrowser("TAKE_SCREENSHOT", targetURL)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]interface{}{
+			"content": []map[string]interface{}{
+				{
+					"type": "text",
+					"text": resMsg.Data,
+				},
+			},
+		}, nil
+
+	default:
+		return nil, fmt.Errorf("unknown tool: %s", params.Name)
+	}
+}
+
+func processJSONRPC(reqBytes []byte) []byte {
+	var req JSONRPCRequest
+	if err := json.Unmarshal(reqBytes, &req); err != nil {
+		errResp, _ := json.Marshal(JSONRPCResponse{
+			JSONRPC: "2.0",
+			Error: map[string]interface{}{
+				"code":    -32700,
+				"message": "Parse error",
+			},
+		})
+		return errResp
+	}
+
+	switch req.Method {
+	case "initialize":
+		res, _ := json.Marshal(JSONRPCResponse{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Result: map[string]interface{}{
+				"protocolVersion": "2024-11-05",
+				"capabilities": map[string]interface{}{
+					"tools": map[string]interface{}{},
+				},
+				"serverInfo": map[string]interface{}{
+					"name":    "cosmos-embedded-mcp",
+					"version": "1.0.0",
+				},
+			},
+		})
+		return res
+
+	case "notifications/initialized":
+		return nil
+
+	case "tools/list":
+		res, _ := json.Marshal(JSONRPCResponse{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Result: map[string]interface{}{
+				"tools": getToolsList(),
+			},
+		})
+		return res
+
+	case "tools/call":
+		var params CallToolParams
+		if err := json.Unmarshal(req.Params, &params); err != nil {
+			res, _ := json.Marshal(JSONRPCResponse{
+				JSONRPC: "2.0",
+				ID:      req.ID,
+				Error: map[string]interface{}{
+					"code":    -32602,
+					"message": "Invalid params",
+				},
+			})
+			return res
+		}
+
+		toolRes, err := handleCallTool(params)
+		if err != nil {
+			res, _ := json.Marshal(JSONRPCResponse{
+				JSONRPC: "2.0",
+				ID:      req.ID,
+				Error: map[string]interface{}{
+					"code":    -32000,
+					"message": err.Error(),
+				},
+			})
+			return res
+		}
+
+		res, _ := json.Marshal(JSONRPCResponse{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Result:  toolRes,
+		})
+		return res
+
+	default:
+		res, _ := json.Marshal(JSONRPCResponse{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Error: map[string]interface{}{
+				"code":    -32601,
+				"message": "Method not found",
+			},
+		})
+		return res
+	}
+}
+
+// readMessage reads 4-byte little-endian header indicating payload length
 func readMessage(r io.Reader) ([]byte, error) {
 	var length uint32
 	err := binary.Read(r, binary.LittleEndian, &length)
@@ -159,7 +465,7 @@ func readMessage(r io.Reader) ([]byte, error) {
 	return buf, nil
 }
 
-// writeMessage writes a 4-byte little-endian header followed by the payload to stdout.
+// writeMessage writes 4-byte little-endian header followed by payload
 func writeMessage(w io.Writer, msg []byte) error {
 	writeMu.Lock()
 	defer writeMu.Unlock()
@@ -172,7 +478,6 @@ func writeMessage(w io.Writer, msg []byte) error {
 	return err
 }
 
-// sendSystemLog sends a log entry back to the Chrome extension to display in the UI log view
 func sendSystemLog(level, format string, args ...interface{}) {
 	text := fmt.Sprintf(format, args...)
 	msg := map[string]string{
@@ -184,143 +489,68 @@ func sendSystemLog(level, format string, args ...interface{}) {
 	_ = writeMessage(os.Stdout, bytes)
 }
 
-// startHeartbeat executes every 20 seconds pushing HEARTBEAT_KEEP_ALIVE packets to Chrome
 func startHeartbeat() {
 	ticker := time.NewTicker(20 * time.Second)
 	defer ticker.Stop()
-
 	heartbeatMsg := []byte(`{"type":"HEARTBEAT_KEEP_ALIVE"}`)
-
 	for range ticker.C {
-		log.Println("Sending HEARTBEAT_KEEP_ALIVE...")
-		err := writeMessage(os.Stdout, heartbeatMsg)
-		if err != nil {
-			log.Printf("Error sending heartbeat: %v", err)
-		}
+		_ = writeMessage(os.Stdout, heartbeatMsg)
 	}
 }
 
-// startFilePolling continuously polls for browser_job.json in the system temporary directory
 func startFilePolling() {
 	jobPath := filepath.Join(os.TempDir(), "browser_job.json")
-	log.Printf("Starting job file polling at: %s", jobPath)
-
 	for {
 		time.Sleep(1 * time.Second)
-
-		// Check if file exists
 		if _, err := os.Stat(jobPath); os.IsNotExist(err) {
 			continue
 		}
-
-		log.Println("Found browser_job.json. Processing...")
-
-		// Read and burn immediately
 		data, err := os.ReadFile(jobPath)
 		if err != nil {
-			log.Printf("Failed to read job file: %v", err)
 			continue
 		}
-
-		// Delete the file immediately to avoid re-triggering or multiple reads
-		if err := os.Remove(jobPath); err != nil {
-			log.Printf("Failed to remove job file: %v", err)
-		} else {
-			log.Println("Successfully read and burned browser_job.json")
-		}
-
+		_ = os.Remove(jobPath)
 		var job Job
 		if err := json.Unmarshal(data, &job); err != nil {
-			log.Printf("Failed to unmarshal job JSON: %v", err)
-			sendSystemLog("error", "Failed to parse job JSON: %v", err)
 			continue
 		}
-
-		// Validate token in memory
 		tokenLock.RLock()
 		currentValidToken := validToken
 		tokenLock.RUnlock()
-
 		if job.Token != currentValidToken {
-			log.Printf("Authorization failed: provided token %q does not match locked token %q", job.Token, currentValidToken)
-			sendSystemLog("error", "Unauthorized access attempt: invalid token provided in browser_job.json")
 			continue
 		}
-
-		// Process the action
-		log.Printf("Processing authorized job: Action=%s, URL=%s", job.Action, job.URL)
-		sendSystemLog("info", "Received authorized job. Action: %s, URL: %s", job.Action, job.URL)
-
-		// Send job to Chrome background worker
 		jobPayload := map[string]string{
 			"type":   "JOB_REQUEST",
 			"action": job.Action,
 			"url":    job.URL,
 		}
-		payloadBytes, err := json.Marshal(jobPayload)
-		if err != nil {
-			log.Printf("Failed to marshal job request: %v", err)
-			continue
-		}
-
-		err = writeMessage(os.Stdout, payloadBytes)
-		if err != nil {
-			log.Printf("Failed to send job request to Edge: %v", err)
-			sendSystemLog("error", "Failed to send job request to browser: %v", err)
-		}
+		payloadBytes, _ := json.Marshal(jobPayload)
+		_ = writeMessage(os.Stdout, payloadBytes)
 	}
 }
 
-// startVproxyPolling continuously polls for vproxy_sync.json in temp directory
 func startVproxyPolling() {
 	syncPath := filepath.Join(os.TempDir(), "vproxy_sync.json")
-	log.Printf("Starting vproxy sync file polling at: %s", syncPath)
-
 	for {
 		time.Sleep(1 * time.Second)
-
 		if _, err := os.Stat(syncPath); os.IsNotExist(err) {
 			continue
 		}
-
-		log.Println("Found vproxy_sync.json. Processing vproxy sync...")
-
 		data, err := os.ReadFile(syncPath)
 		if err != nil {
-			log.Printf("Failed to read vproxy sync file: %v", err)
 			continue
 		}
-
-		if err := os.Remove(syncPath); err != nil {
-			log.Printf("Failed to remove vproxy sync file: %v", err)
-		}
-
+		_ = os.Remove(syncPath)
 		var syncFile VproxySyncFile
 		if err := json.Unmarshal(data, &syncFile); err != nil {
-			log.Printf("Failed to unmarshal vproxy_sync.json: %v", err)
-			sendSystemLog("error", "Failed to parse vproxy_sync.json: %v", err)
 			continue
 		}
-
-		if syncFile.Token != "" {
-			tokenLock.RLock()
-			currentValidToken := validToken
-			tokenLock.RUnlock()
-
-			if syncFile.Token != currentValidToken {
-				log.Printf("Vproxy sync auth failed: provided token %q invalid", syncFile.Token)
-				sendSystemLog("error", "Unauthorized vproxy sync attempt")
-				continue
-			}
-		}
-
 		dispatchVproxySync(syncFile)
 	}
 }
 
-// triggerVproxyScan scans for local vproxy config files or sends default sync if present
 func triggerVproxyScan() {
-	// Check if vproxy_sync.json exists or generate default/sample vproxy profile
 	syncPath := filepath.Join(os.TempDir(), "vproxy_sync.json")
 	if _, err := os.Stat(syncPath); err == nil {
 		data, err := os.ReadFile(syncPath)
@@ -332,37 +562,24 @@ func triggerVproxyScan() {
 			}
 		}
 	}
-	sendSystemLog("system", "VProxy scan completed. No active vproxy_sync.json pending.")
 }
 
 func dispatchVproxySync(syncFile VproxySyncFile) {
-	log.Printf("Synced %d proxy profiles from vproxy config", len(syncFile.Profiles))
-	sendSystemLog("system", "Successfully synced %d proxy profiles from vproxy", len(syncFile.Profiles))
-
 	syncPayload := map[string]interface{}{
 		"type":         "VPROXY_SYNC",
 		"profiles":     syncFile.Profiles,
 		"autoSelectId": syncFile.AutoSelectID,
 	}
-
 	payloadBytes, err := json.Marshal(syncPayload)
 	if err == nil {
 		_ = writeMessage(os.Stdout, payloadBytes)
 	}
 }
 
-// writeJobResponse writes the result payload back to browser_response.json in temp directory
 func writeJobResponse(msg ChromeMessage) {
 	resPath := filepath.Join(os.TempDir(), "browser_response.json")
 	data, err := json.MarshalIndent(msg, "", "  ")
-	if err != nil {
-		log.Printf("Failed to marshal job response: %v", err)
-		return
-	}
-	err = os.WriteFile(resPath, data, 0666)
-	if err != nil {
-		log.Printf("Failed to write response file: %v", err)
-	} else {
-		log.Printf("Wrote job response to %s", resPath)
+	if err == nil {
+		_ = os.WriteFile(resPath, data, 0666)
 	}
 }

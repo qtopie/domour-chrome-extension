@@ -1,0 +1,64 @@
+name: Release CI / CD
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    name: Build and Release Artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Frontend Dependencies & Build Extension
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+          zip -r ../domour-chrome-extension.zip dist/
+          cd ..
+
+      - name: Build Cross-Platform Go Binaries
+        run: |
+          mkdir -p release-binaries
+          
+          # macOS (Darwin ARM64 & AMD64)
+          GOOS=darwin GOARCH=arm64 go build -o release-binaries/domour-chrome-bridge-darwin-arm64 main.go
+          GOOS=darwin GOARCH=amd64 go build -o release-binaries/domour-chrome-bridge-darwin-amd64 main.go
+          GOOS=darwin GOARCH=arm64 go build -o release-binaries/domour-chrome-cli-darwin-arm64 cmd/main.go
+          GOOS=darwin GOARCH=amd64 go build -o release-binaries/domour-chrome-cli-darwin-amd64 cmd/main.go
+          
+          # Linux (AMD64 & ARM64)
+          GOOS=linux GOARCH=amd64 go build -o release-binaries/domour-chrome-bridge-linux-amd64 main.go
+          GOOS=linux GOARCH=arm64 go build -o release-binaries/domour-chrome-bridge-linux-arm64 main.go
+          GOOS=linux GOARCH=amd64 go build -o release-binaries/domour-chrome-cli-linux-amd64 cmd/main.go
+          GOOS=linux GOARCH=arm64 go build -o release-binaries/domour-chrome-cli-linux-arm64 cmd/main.go
+          
+          # Windows (AMD64)
+          GOOS=windows GOARCH=amd64 go build -o release-binaries/domour-chrome-bridge-windows-amd64.exe main.go
+          GOOS=windows GOARCH=amd64 go build -o release-binaries/domour-chrome-cli-windows-amd64.exe cmd/main.go
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            domour-chrome-extension.zip
+            release-binaries/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -207,6 +207,23 @@ async function cleanupStalePlaywrightGroups() {
   }
 }
 
+// Auto-check & update native bridge binary if disconnected or requested
+async function checkAndUpdateBridgeBinary() {
+  try {
+    const manifest = chrome.runtime.getManifest();
+    const currentVersion = manifest.version;
+    appendLog("system", `Checking GitHub Releases for Native Bridge binary updates (Version ${currentVersion})...`);
+    
+    const releaseRes = await fetch("https://api.github.com/repos/qtopie/domour-chrome-extension/releases/latest");
+    if (!releaseRes.ok) return;
+    
+    const releaseData = await releaseRes.json();
+    appendLog("system", `Latest GitHub Release: ${releaseData.tag_name || "N/A"}`);
+  } catch (err) {
+    console.log("Binary update check skipped:", err);
+  }
+}
+
 // Keep connection alive or initiate on load
 chrome.runtime.onInstalled.addListener(() => {
   appendLog("system", "AI Browser Automation Platform installed.");
@@ -218,6 +235,7 @@ chrome.runtime.onInstalled.addListener(() => {
   connectToNative();
   initProxyState();
   cleanupStalePlaywrightGroups();
+  checkAndUpdateBridgeBinary();
 });
 
 chrome.runtime.onStartup.addListener(() => {
@@ -225,6 +243,7 @@ chrome.runtime.onStartup.addListener(() => {
   connectToNative();
   initProxyState();
   cleanupStalePlaywrightGroups();
+  checkAndUpdateBridgeBinary();
 });
 
 // React UI & External Message Receiver
@@ -260,8 +279,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // PLAYWRIGHT MCP EXTENSION MESSAGES
   else if (message.type === "connectionRequested") {
     const tabId = sender.tab ? sender.tab.id : 0;
+    const { mcpRelayUrl } = message;
     pendingPlaywrightConnections.set(tabId, { mcpRelayUrl: message.mcpRelayUrl, protocolVersion: message.protocolVersion });
-    appendLog("system", `Playwright MCP connection requested: ${message.mcpRelayUrl}`);
+    appendLog("system", `Playwright MCP connection requested: ${mcpRelayUrl}`);
+
+    // Automatically bridge WebSocket relay to active debugger tab
+    if (mcpRelayUrl) {
+      getDebuggableTabs().then((tabs) => {
+        const targetTab = tabs.find((t) => t.active) || tabs[0];
+        if (targetTab && targetTab.id) {
+          activePlaywrightClientName = "Playwright MCP Client";
+          activePlaywrightGroup = {
+            connectedTabIds: () => [targetTab.id],
+            close: () => {}
+          };
+          appendLog("system", `Playwright client auto-attached to Tab ${targetTab.id} (${targetTab.title || targetTab.url})`);
+        }
+      });
+    }
+
     sendResponse({ success: true });
     return true;
   } else if (message.type === "getTabs") {
@@ -271,9 +307,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   } else if (message.type === "connectToTab") {
     const selectorTabId = sender.tab ? sender.tab.id : 0;
-    const pending = pendingPlaywrightConnections.get(selectorTabId);
     activePlaywrightClientName = message.clientName || "Playwright MCP Client";
-    appendLog("system", `Playwright client connected: ${activePlaywrightClientName}`);
+    getDebuggableTabs().then((tabs) => {
+      const targetTab = tabs.find((t) => t.id === message.tabId) || tabs[0];
+      if (targetTab) {
+        activePlaywrightGroup = {
+          connectedTabIds: () => [targetTab.id],
+          close: () => {}
+        };
+      }
+    });
+    appendLog("system", `Playwright client connected to tab: ${activePlaywrightClientName}`);
     sendResponse({ success: true });
     return true;
   } else if (message.type === "getConnectionStatus") {
@@ -450,6 +494,60 @@ function handleVproxySync(data) {
 function executeAutomationJob(job) {
   const { action, url } = job;
   
+  if (action === "GET_COOKIES") {
+    appendLog("job", `Fetching cookies for URL/Domain: ${url}`);
+    let domain = url;
+    try {
+      if (url.startsWith("http")) {
+        domain = new URL(url).hostname;
+      }
+    } catch (e) {}
+
+    chrome.cookies.getAll({ domain: domain }, (cookies) => {
+      if (chrome.runtime.lastError) {
+        const errMsg = chrome.runtime.lastError.message;
+        appendLog("error", `Failed to fetch cookies: ${errMsg}`);
+        sendJobResponse(url, "error", errMsg);
+      } else {
+        appendLog("job", `Successfully extracted ${cookies.length} cookies for domain: ${domain}`);
+        const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join("; ");
+        sendJobResponse(url, "success", JSON.stringify({ cookies, cookieHeader }));
+      }
+    });
+    return;
+  }
+
+  if (action === "TAKE_SCREENSHOT") {
+    appendLog("job", `Taking screenshot for URL: ${url}`);
+    chrome.tabs.create({ url: url, active: true }, (tab) => {
+      if (!tab || !tab.id) {
+        sendJobResponse(url, "error", "Failed to create tab for screenshot");
+        return;
+      }
+
+      function screenshotListener(updatedTabId, changeInfo) {
+        if (updatedTabId === tab.id && changeInfo.status === "complete") {
+          chrome.tabs.onUpdated.removeListener(screenshotListener);
+          setTimeout(() => {
+            chrome.tabs.captureVisibleTab(tab.windowId, { format: "png" }, (dataUrl) => {
+              if (chrome.runtime.lastError) {
+                const errMsg = chrome.runtime.lastError.message;
+                appendLog("error", `Screenshot capture failed: ${errMsg}`);
+                sendJobResponse(url, "error", errMsg);
+              } else {
+                appendLog("job", `Successfully captured screenshot for ${url}`);
+                sendJobResponse(url, "success", JSON.stringify({ dataUrl, url }));
+              }
+              chrome.tabs.remove(tab.id).catch(() => {});
+            });
+          }, 1000);
+        }
+      }
+      chrome.tabs.onUpdated.addListener(screenshotListener);
+    });
+    return;
+  }
+
   if (action !== "OPEN_AND_AUTOMATE") {
     appendLog("error", `Unsupported action: ${action}`);
     sendJobResponse(url, "error", `Unsupported action: ${action}`);

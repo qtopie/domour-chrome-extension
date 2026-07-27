@@ -25,14 +25,16 @@ export default function App() {
     setIsExtension(!!hasChrome);
 
     if (hasChrome) {
-      // 1. Load or Generate Token
+      // Fixed token matching .agents/mcp_config.json
+      const FIXED_TOKEN = "tk_22266e38311c82c36af401b9a9da4d";
+
+      // 1. Load or Set Fixed Token
       chrome.storage.local.get(["api_token"], (result: { api_token?: string }) => {
-        if (result.api_token) {
-          setToken(result.api_token);
+        if (result.api_token === FIXED_TOKEN) {
+          setToken(FIXED_TOKEN);
         } else {
-          const newToken = generateToken();
-          chrome.storage.local.set({ api_token: newToken }, () => {
-            setToken(newToken);
+          chrome.storage.local.set({ api_token: FIXED_TOKEN }, () => {
+            setToken(FIXED_TOKEN);
             // Notify background worker that token has been initialized
             chrome.runtime.sendMessage({ type: "RECONNECT" }).catch(() => {});
           });
@@ -161,7 +163,25 @@ export default function App() {
       {/* Header Panel */}
       <header className="header">
         <div className="logo-container">
-          <div className="logo-dot" />
+          <svg className="app-logo-icon" viewBox="0 0 128 128" fill="none" width="28" height="28">
+            <circle cx="64" cy="64" r="58" fill="#0f0c1b" stroke="url(#logo-grad)" strokeWidth="4"/>
+            <ellipse cx="64" cy="64" rx="46" ry="18" fill="none" stroke="#00f2fe" strokeWidth="3" strokeDasharray="6 4" opacity="0.7" transform="rotate(-30 64 64)"/>
+            <ellipse cx="64" cy="64" rx="46" ry="18" fill="none" stroke="#a855f7" strokeWidth="3" opacity="0.8" transform="rotate(30 64 64)"/>
+            <circle cx="64" cy="64" r="30" fill="none" stroke="url(#logo-grad)" strokeWidth="5"/>
+            <circle cx="64" cy="64" r="14" fill="url(#core-grad)"/>
+            <circle cx="26" cy="44" r="4" fill="#00f2fe"/>
+            <circle cx="102" cy="84" r="4" fill="#a855f7"/>
+            <defs>
+              <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#00f2fe"/>
+                <stop offset="100%" stopColor="#a855f7"/>
+              </linearGradient>
+              <linearGradient id="core-grad" x1="0%" y1="100%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#3b82f6"/>
+                <stop offset="100%" stopColor="#8b5cf6"/>
+              </linearGradient>
+            </defs>
+          </svg>
           <h1 className="logo-text">
             COSMOS <span className="logo-highlight">BRIDGE</span>
           </h1>

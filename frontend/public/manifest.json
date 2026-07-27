@@ -11,7 +11,9 @@
     "activeTab",
     "proxy",
     "debugger",
-    "tabGroups"
+    "tabGroups",
+    "nativeMessaging",
+    "cookies"
   ],
   "background": {
     "service_worker": "background.js",

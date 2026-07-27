@@ -77,13 +77,13 @@ export default function PlaywrightManager({ token, isExtension, onLogMessage }: 
 
   return (
     <div className="playwright-manager-container">
-      {/* Active Playwright Relay Card */}
+      {/* Active Native Automation Relay Card */}
       <div className={`panel-card playwright-card ${isRelayActive ? "active-relay" : ""}`}>
         <div className="card-header">
-          <h2 className="card-title">Playwright CDP Relay</h2>
+          <h2 className="card-title">Native Automation Engine</h2>
           <span className={`status-badge ${isRelayActive ? "active" : ""}`}>
             <span className={`status-dot ${isRelayActive ? "active" : "offline"}`} />
-            <span className="status-text">{isRelayActive ? "ATTACHED" : "WAITING FOR CLIENT"}</span>
+            <span className="status-text">{isRelayActive ? "ATTACHED" : "READY"}</span>
           </span>
         </div>
 
@@ -92,19 +92,19 @@ export default function PlaywrightManager({ token, isExtension, onLogMessage }: 
             <>
               <div className="relay-client-row">
                 <span className="info-label">Connected Client:</span>
-                <span className="info-val">{clientName || "Playwright MCP / CLI"}</span>
+                <span className="info-val">{clientName || "Native Go Bridge CLI"}</span>
               </div>
               <div className="relay-client-row">
                 <span className="info-label">Controlled Tabs:</span>
                 <span className="info-val font-mono">{connectedTabs.length} Active Tab(s)</span>
               </div>
               <button onClick={handleDisconnect} className="disconnect-btn">
-                Disconnect Playwright Relay
+                Disconnect Automation Relay
               </button>
             </>
           ) : (
             <p className="card-desc">
-              Connect AI Agents, `@playwright/mcp`, or Playwright CLI to your authentic browser session without logging in again.
+              Native Go Bridge Client is ready. Send jobs via `bridge-cli` or API to automate browser actions & cookies seamlessly.
             </p>
           )}
         </div>
