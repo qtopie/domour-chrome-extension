@@ -2,13 +2,9 @@
 
 # Script to register Native Messaging Host for Microsoft Edge and Google Chrome on macOS / Linux
 
-if [ -z "$1" ]; then
-    echo "Usage: ./register_host.sh <EXTENSION_ID>"
-    echo "Example: ./register_host.sh madmalocaomchfoncgombejhddmmepjg"
-    exit 1
-fi
+PROD_EXTENSION_ID="ndbhggifgbebojmidnoenkfpiiknkggc"
+EXTENSION_ID="${1:-$PROD_EXTENSION_ID}"
 
-EXTENSION_ID=$1
 HOST_NAME="com.go_react.search_bridge"
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 BINARY_PATH="${SCRIPT_DIR}/bin/domour-chrome-bridge"
@@ -28,7 +24,8 @@ MANIFEST_CONTENT=$(cat <<EOF
   "path": "${BINARY_PATH}",
   "type": "stdio",
   "allowed_origins": [
-    "chrome-extension://${EXTENSION_ID}/"
+    "chrome-extension://${EXTENSION_ID}/",
+    "chrome-extension://ndbhggifgbebojmidnoenkfpiiknkggc/"
   ]
 }
 EOF
