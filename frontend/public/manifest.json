@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "AI Browser Automation Platform",
+  "name": "Domour Copilot Extension",
   "version": "1.0.0",
   "description": "Secure Edge Extension AI Browser Automation Bridge",
   "permissions": [
