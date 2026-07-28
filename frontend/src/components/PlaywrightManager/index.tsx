@@ -75,6 +75,27 @@ export default function PlaywrightManager({ token, isExtension, onLogMessage }: 
     }
   };
 
+  const [allowCookies, setAllowCookies] = useState<boolean>(true);
+
+  useEffect(() => {
+    if (isExtension && typeof chrome !== "undefined" && chrome.storage) {
+      chrome.storage.local.get(["allow_cookie_extraction"], (res: any) => {
+        if (res.allow_cookie_extraction !== undefined) {
+          setAllowCookies(res.allow_cookie_extraction);
+        }
+      });
+    }
+  }, [isExtension]);
+
+  const toggleCookieExtraction = (enabled: boolean) => {
+    setAllowCookies(enabled);
+    if (isExtension && typeof chrome !== "undefined" && chrome.storage) {
+      chrome.storage.local.set({ allow_cookie_extraction: enabled }, () => {
+        onLogMessage?.("system", `Cookie extraction permission ${enabled ? "ENABLED" : "DISABLED"} by user.`);
+      });
+    }
+  };
+
   return (
     <div className="playwright-manager-container">
       {/* Active Native Automation Relay Card */}
@@ -104,9 +125,42 @@ export default function PlaywrightManager({ token, isExtension, onLogMessage }: 
             </>
           ) : (
             <p className="card-desc">
-              Native Go Bridge Client is ready. Send jobs via `bridge-cli` or API to automate browser actions & cookies seamlessly.
+              Native Go Bridge Client is ready. Send jobs via `domour-chrome-cli` or API to automate browser actions & cookies seamlessly.
             </p>
           )}
+        </div>
+      </div>
+
+      {/* Privacy & Security Controls Card */}
+      <div className="panel-card privacy-card">
+        <div className="card-header">
+          <h2 className="card-title">Privacy & Sensitive Permissions</h2>
+        </div>
+        <div className="privacy-toggle-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px' }}>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-main, #f3f4f6)' }}>Allow Cookie Extraction</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted, #9ca3af)', marginTop: '2px' }}>
+              Permit AI agents to retrieve authentic session cookies for login bypass.
+            </div>
+          </div>
+          <label style={{ position: 'relative', display: 'inline-block', width: '40px', height: '22px', cursor: 'pointer' }}>
+            <input 
+              type="checkbox" 
+              checked={allowCookies} 
+              onChange={(e) => toggleCookieExtraction(e.target.checked)}
+              style={{ opacity: 0, width: 0, height: 0 }} 
+            />
+            <span style={{
+              position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0,
+              backgroundColor: allowCookies ? '#10b981' : '#374151',
+              borderRadius: '22px', transition: '.3s'
+            }}>
+              <span style={{
+                position: 'absolute', content: '""', height: '16px', width: '16px', left: allowCookies ? '20px' : '3px', bottom: '3px',
+                backgroundColor: '#ffffff', borderRadius: '50%', transition: '.3s'
+              }} />
+            </span>
+          </label>
         </div>
       </div>
 

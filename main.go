@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -245,6 +246,99 @@ func startEmbeddedMCPServer(port int) {
 			flusher.Flush()
 			select {}
 		}
+	})
+
+	http.HandleFunc("/proxy.pac", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/x-ns-proxy-autoconfig")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+
+		homeDir, _ := os.UserHomeDir()
+		vproxyCfgPath := filepath.Join(homeDir, ".vproxy", "config.json")
+
+		defaultUpstream := "SOCKS5 192.168.50.31:1080; SOCKS5 192.168.50.189:1080; SOCKS5 127.0.0.1:1080"
+		defaultDomains := []string{
+			"google.com", "gstatic.com", "googleapis.com", "1e100.net", "gmail.com",
+			"googleusercontent.com", "youtube.com", "youtu.be", "ggpht.com", "ytimg.com",
+			"googlevideo.com", "wikimedia.org", "live.com", "githubusercontent.com", "github.com",
+		}
+
+		proxyString := defaultUpstream
+		var matchedDomains []string
+
+		if cfgData, err := os.ReadFile(vproxyCfgPath); err == nil {
+			var cfg struct {
+				Upstreams []string `json:"upstreams"`
+				Rules     []string `json:"rules"`
+			}
+			if err := json.Unmarshal(cfgData, &cfg); err == nil {
+				// 1. Dynamic Upstreams
+				var pacProxies []string
+				for _, up := range cfg.Upstreams {
+					upStr := up
+					if idx := strings.Index(upStr, "://"); idx != -1 {
+						scheme := strings.ToUpper(upStr[:idx])
+						addr := upStr[idx+3:]
+						if scheme == "SOCKS5" || scheme == "SOCKS" {
+							pacProxies = append(pacProxies, fmt.Sprintf("SOCKS5 %s; SOCKS %s", addr, addr))
+						} else if scheme == "HTTP" || scheme == "HTTPS" {
+							pacProxies = append(pacProxies, fmt.Sprintf("PROXY %s", addr))
+						}
+					}
+				}
+				if len(pacProxies) > 0 {
+					proxyString = strings.Join(pacProxies, "; ")
+				}
+
+				// 2. Dynamic Domain Rules
+				for _, rule := range cfg.Rules {
+					parts := strings.Split(rule, ",")
+					if len(parts) == 2 && parts[1] == "PROXY" && parts[0] != "DEFAULT" && !strings.HasPrefix(parts[0], "PROCESS") {
+						matchedDomains = append(matchedDomains, parts[0])
+					}
+				}
+			}
+		}
+
+		if len(matchedDomains) == 0 {
+			matchedDomains = defaultDomains
+		}
+
+		// Escape domain strings for regex
+		var regexConditions []string
+		for _, d := range matchedDomains {
+			escapedDomain := strings.ReplaceAll(d, ".", "\\.")
+			regexConditions = append(regexConditions, fmt.Sprintf("        if (/(?:^|\\.)%s$/.test(host)) return \"+proxy\";", escapedDomain))
+		}
+
+		regexBlock := strings.Join(regexConditions, "\n")
+
+		pacScript := fmt.Sprintf(`var FindProxyForURL = function(init, profiles) {
+    return function(url, host) {
+        "use strict";
+        var result = init, scheme = url.substr(0, url.indexOf(":"));
+        do {
+            result = profiles[result];
+            if (typeof result === "function") result = result(url, host, scheme);
+        } while (typeof result !== "string" || result.charCodeAt(0) === 43);
+        return result;
+    };
+}("+auto switch", {
+    "+auto switch": function(url, host, scheme) {
+        "use strict";
+        // LAN & Localhost Bypass Rules (Never use proxy for intranet)
+        if (isPlainHostName(host) || host === '127.0.0.1' || host === 'localhost' || /(?:^|\.)local$/.test(host)) return "DIRECT";
+        if (/^(?:10|127|192\.168|172\.(?:1[6-9]|2[0-9]|3[01]))\./.test(host)) return "DIRECT";
+
+%s
+        return "DIRECT";
+    },
+    "+proxy": function(url, host, scheme) {
+        "use strict";
+        return "%s";
+    }
+});`, regexBlock, proxyString)
+
+		w.Write([]byte(pacScript))
 	})
 
 	log.Printf("Embedded Streamable HTTP MCP Server started on http://localhost:%d/mcp", port)

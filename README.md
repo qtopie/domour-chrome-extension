@@ -1,118 +1,128 @@
-# AI Browser Automation Platform (Domour Copilot Bridge)
+# Domour Chrome Extension 本地部署与运行指南 🚀
 
-A secure, extension-first browser automation platform using a **React (Vite + TS)** side panel UI and a **Go** native messaging bridge daemon. It operates entirely within standard browser extension security boundaries (no CDP/debugging ports required) and routes automation jobs securely using a zero-trust token verification model.
-
----
-
-## 🏗️ Architecture Blueprint
-
-The platform functions across three distinct components:
-1. **Frontend UI (Microsoft Edge Side Panel)**: Built using React (Vite + TypeScript). It manages the API token, shows native bridge connection status, and displays live scrolling execution logs.
-2. **Background Service Worker (`background.js`)**: An MV3 service worker that establishes a native port to Go, executes automation scripting, intercepts heartbeats to defeat Microsoft Edge's 30-second worker idle shutdown, and pipes logs.
-3. **Local Bridge Engine (`main.go`)**: A native Go binary that interacts via standard I/O (using 4-byte little-endian length prefixes). It listens in a blocked state for `INITIAL_AUTH`, polls the system temp directory for jobs (`browser_job.json`), performs zero-trust token matching, and pushes heartbeats.
+包含完整的 Go 后台守护进程编译、前端 Side Panel 编译、Chrome 原生宿主注册以及 AI Agent (MCP) 接入步骤。
 
 ---
 
-## 📂 File Layout
+## 🛠️ 第一步：一键编译（Build）
 
-```text
-.
-├── bin/
-│   ├── bridge                  # Compiled Go native bridge daemon (NM Host)
-│   └── bridge-cli              # Compiled CLI tool for dropping authorized jobs
-├── cmd/
-│   └── main.go                 # CLI tool entry point (formerly send_cmd.go)
-├── frontend/                   # Vite + React + TS Side Panel Frontend
-│   ├── dist/                   # Compiled production artifact (Unpacked Extension)
-│   ├── public/
-│   │   ├── background.js       # Extension Service Worker
-│   │   └── manifest.json       # Manifest V3 configuration
-│   ├── src/
-│   │   ├── App.tsx             # Gorgeous panel UI with Token Copy & Log Console
-│   │   ├── index.css           # Custom Vanilla CSS premium design tokens
-│   │   └── main.tsx
-│   └── vite.config.ts          # Compilation configurations (hashing disabled)
-├── main.go                     # Core Go Bridge Daemon source
-├── register_host.sh            # Helper script to register NM Host on Linux
-└── README.md                   # This instruction file
-```
+在项目根目录下使用 `task` 指令或直接命令行编译后端与前端：
 
----
-
-## ⚡ Setup & Installation
-
-Follow these steps to build, register, and run the platform:
-
-### 1. Compile the Go Core
-Run the compilation command in the root directory to generate both the bridge daemon and the CLI tool:
+### 方式 A：使用 Task 工具（推荐）
 ```bash
-# Cleans dependencies
+task
+```
+*这会自动执行后端 Go 编译和前端 React Vite 打包。*
+
+### 方式 B：手动命令行编译
+
+```bash
+# 1. 编译后端 Go 守护进程与 CLI 工具
 go mod tidy
+mkdir -p bin
+go build -o bin/domour-chrome-bridge main.go
+go build -o bin/domour-chrome-cli cmd/main.go
 
-# Builds binaries
-go build -o bin/bridge main.go
-go build -o bin/bridge-cli cmd/main.go
-```
-
-### 2. Build the React Side Panel
-Compile the React frontend codebase:
-```bash
+# 2. 编译前端 React 扩展侧边栏
 cd frontend
 npm install
-npm run dev # To check dev server (optional)
 npm run build
 cd ..
 ```
-The compiled, ready-to-load Edge Extension folder is generated in `frontend/dist/`.
-
-### 3. Load the Extension in Microsoft Edge
-1. Open Microsoft Edge and navigate to `edge://extensions/`.
-2. Enable **Developer mode** using the toggle in the bottom-left corner.
-3. Click the **Load unpacked** button.
-4. Select the `frontend/dist` directory from this project workspace.
-5. Once loaded, copy the generated **Extension ID** (a 32-character string, e.g., `abcdefghijklmnopqrstuvwxyzabcdef`).
-
-### 4. Register the Native Messaging Host
-To allow Microsoft Edge to communicate with your compiled Go binary, run the register script with your Extension ID:
-```bash
-./register_host.sh <YOUR_EXTENSION_ID>
-```
-On Linux, this writes a user-specific manifest under `~/.config/microsoft-edge/NativeMessagingHosts/com.go_react.search_bridge.json`.
-
-### 5. Launch Microsoft Edge with Extension (Automated Testing)
-You can launch an isolated instance of Microsoft Edge with the compiled unpacked extension already preloaded by running:
-```bash
-task edge:launch
-```
-This launches a separate session using a local profile `.edge-profile` so that it does not read or affect your daily browser profile.
+*编译产物说明*：
+- 前端扩展目录：`frontend/dist/`
+- 后端守护进程：`bin/domour-chrome-bridge`
+- 本地 CLI 工具：`bin/domour-chrome-cli`
 
 ---
 
-## 🛠️ Operating & Testing the Platform
+## 🧩 第二步：在 Chrome / Edge 中加载扩展
 
-### Step 1: Open the Side Panel
-1. In Microsoft Edge, click the **Extensions** icon (puzzle piece) in the toolbar.
-2. Select **AI Browser Automation Platform** to open the side panel.
-3. On first launch, the extension generates a secure token (e.g. `tk_a6c9d7...`).
-4. Once the side panel is visible, check the status at the top. It should display **ACTIVE**, confirming a successful connection to the Go daemon.
+1. 打开 Chrome 或 Edge 浏览器，导航至扩展管理页面：
+   - **Chrome**: `chrome://extensions/`
+   - **Edge**: `edge://extensions/`
+2. 开启右上角/左下角 **“开发者模式” (Developer mode)** 开关。
+3. 点击 **“加载已解压的扩展程序” (Load unpacked)** 按钮。
+4. 选择本项目中的 `frontend/dist` 文件夹。
+5. 加载成功后，复制浏览器赋予的 **Extension ID**（32位的字符串，例如：`ijffcnffoapdjfkmphkonddmmagcllok`）。
 
-### Step 2: Trigger Automation via CLI
-Use the compiled `bridge-cli` tool to send an automation command to the bridge. 
+---
 
-Copy your token from the Side Panel UI and run:
+## 🔒 第三步：注册 Native Messaging 原生通信宿主
+
+为了让 Chrome / Edge 允许后台 `domour-chrome-bridge` 进程与扩展直连，运行注册脚本并传入你的 Extension ID：
+
 ```bash
-./bin/bridge-cli <YOUR_TOKEN> <TARGET_URL>
-```
-*Example:*
-```bash
-./bin/bridge-cli tk_a61cf2de984e72390f7d4576b9101d https://example.com
+./register_host.sh <YOUR_EXTENSION_ID>
 ```
 
-#### What happens under the hood:
-1. The CLI tool writes the job payload to `os.TempDir()/browser_job.json`.
-2. The Go daemon polls the folder, reads the job, and immediately deletes ("burns") the file.
-3. The daemon verifies the job's `token` against its locked memory token.
-4. If authorized, Go routes the job to the Edge extension using 4-byte standard NM I/O framing.
-5. The extension's service worker opens the URL in the background, waits for `'complete'`, runs a scripting injection to extract the page properties, and responds back.
-6. The Go daemon writes the scraping response details to `os.TempDir()/browser_response.json`.
-7. Execution events are displayed live in the Side Panel log view!
+*示例*：
+```bash
+./register_host.sh ijffcnffoapdjfkmphkonddmmagcllok
+```
+*运行后脚本会自动将清单写入 macOS / Linux 的标准原生宿主目录（如 `~/Library/Application Support/Google/Chrome/NativeMessagingHosts/`）。*
+
+---
+
+## 🌐 第四步：启动与体验
+
+### 1. 启动侧边栏 (Side Panel)
+- 在浏览器右侧工具栏点击 **Domour Chrome Extension** 图标打开侧边栏。
+- 侧边栏打开时会自动拉起 `bin/domour-chrome-bridge` 守护进程，顶部状态显示 **READY** / **ATTACHED**。
+
+### 2. Streamable HTTP MCP 服务 (Port 6888)
+后台守护进程启动后，会自动在本地提供双重服务：
+- 🤖 **MCP 协议接口**：`http://localhost:6888/mcp`
+- 📄 **动态 PAC 代理服务**：`http://localhost:6888/proxy.pac`
+
+### 3. 配置到 AI Agent
+在你的 Agent / IDE 配置文件（如 `.agents/mcp_config.json` 或 Cursor / Claude Desktop）中配置：
+
+```json
+{
+  "mcpServers": {
+    "domour-chrome-mcp": {
+      "url": "http://localhost:6888/mcp"
+    }
+  }
+}
+```
+
+---
+
+## 🧪 第五步：本地测试验证
+
+### 1. 测试浏览器导航 MCP 工具
+```bash
+curl -X POST http://localhost:6888/mcp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/call",
+    "params": {
+      "name": "browser_navigate",
+      "arguments": { "url": "https://qtopie.space" }
+    }
+  }'
+```
+
+### 2. 测试零 Token 损耗网页截图
+```bash
+curl -X POST http://localhost:6888/mcp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 2,
+    "method": "tools/call",
+    "params": {
+      "name": "browser_take_screenshot",
+      "arguments": { "url": "https://qtopie.space" }
+    }
+  }'
+```
+
+### 3. 测试动态 PAC 规则
+```bash
+curl -i http://localhost:6888/proxy.pac
+```

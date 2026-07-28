@@ -13,6 +13,14 @@ frontend/out/
 
 # Chrome runtime environment
 .chrome-profile/
+.edge-profile/
+.task/
+.DS_Store
+
+# Temporary screenshots & zip
+screenshot.png
+screenshot_1280x800.png
+domour-chrome-extension.zip
 
 # Logs
 *.log

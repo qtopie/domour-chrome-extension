@@ -89,6 +89,16 @@ const DEFAULT_PROFILES = [
     updatedAt: Date.now()
   },
   {
+    id: "vproxy_pac_default",
+    name: "vproxy AutoProxy PAC",
+    mode: "pac_script",
+    pacType: "url",
+    pacUrl: "http://127.0.0.1:6888/proxy.pac",
+    color: "#8b5cf6",
+    isVproxy: true,
+    updatedAt: Date.now()
+  },
+  {
     id: "system",
     name: "System Default Proxy",
     mode: "system",
@@ -115,13 +125,26 @@ function applyProxyConfig(profile) {
       const scheme = profile.scheme || "http";
       const host = profile.host || "127.0.0.1";
       const port = Number(profile.port) || 8080;
-      const bypassList = Array.isArray(profile.bypassList) ? profile.bypassList : [];
+      
+      const defaultLanBypass = [
+        "localhost",
+        "127.0.0.1",
+        "[::1]",
+        "<-loopback>",
+        "192.168.0.0/16",
+        "10.0.0.0/8",
+        "172.16.0.0/12",
+        "*.local"
+      ];
+      
+      const customBypass = Array.isArray(profile.bypassList) ? profile.bypassList : [];
+      const combinedBypass = Array.from(new Set([...defaultLanBypass, ...customBypass]));
 
       config = {
         mode: "fixed_servers",
         rules: {
           singleProxy: { scheme, host, port },
-          bypassList: bypassList
+          bypassList: combinedBypass
         }
       };
     } else if (profile.mode === "pac_script") {
@@ -449,20 +472,22 @@ function handleVproxySync(data) {
 
   chrome.storage.local.get(["proxy_profiles", "active_proxy_id"], (res) => {
     let currentProfiles = res.proxy_profiles || DEFAULT_PROFILES;
-    let activeId = res.active_proxy_id || "direct";
+    let activeId = res.active_proxy_id || "vproxy_pac_default";
 
     data.profiles.forEach((vProfile, index) => {
-      const profileId = vProfile.id || `vproxy_${vProfile.scheme || 'pac'}_${vProfile.port || index}`;
+      const isPacMode = vProfile.mode === "pac_script" || vProfile.pacUrl || vProfile.pacScript || vProfile.pacType || vProfile.scheme === "pac" || vProfile.scheme === "autoproxy";
+      const profileId = vProfile.id || `vproxy_${isPacMode ? 'pac' : (vProfile.scheme || 'fixed')}_${vProfile.port || index}`;
+      
       const formattedProfile = {
         id: profileId,
-        name: vProfile.name || `vproxy ${vProfile.scheme || 'PAC'}`,
-        mode: vProfile.mode || "fixed_servers",
-        scheme: vProfile.scheme,
+        name: vProfile.name || (isPacMode ? "vproxy PAC Profile" : `vproxy ${vProfile.scheme || 'HTTP'}`),
+        mode: isPacMode ? "pac_script" : (vProfile.mode || "fixed_servers"),
+        scheme: vProfile.scheme || "http",
         host: vProfile.host || "127.0.0.1",
-        port: vProfile.port,
+        port: vProfile.port || 18666,
         bypassList: vProfile.bypassList || ["localhost", "127.0.0.1"],
-        pacType: vProfile.pacType,
-        pacUrl: vProfile.pacUrl,
+        pacType: vProfile.pacScript ? "script" : (vProfile.pacType || "url"),
+        pacUrl: vProfile.pacUrl || "http://127.0.0.1:6888/proxy.pac",
         pacScript: vProfile.pacScript,
         color: vProfile.color || "#8b5cf6",
         isVproxy: true,
@@ -495,24 +520,33 @@ function executeAutomationJob(job) {
   const { action, url } = job;
   
   if (action === "GET_COOKIES") {
-    appendLog("job", `Fetching cookies for URL/Domain: ${url}`);
-    let domain = url;
-    try {
-      if (url.startsWith("http")) {
-        domain = new URL(url).hostname;
+    chrome.storage.local.get(["allow_cookie_extraction"], (res) => {
+      const allowed = res.allow_cookie_extraction !== false; // Default true unless explicitly disabled
+      if (!allowed) {
+        appendLog("warning", `Blocked GET_COOKIES request for ${url}: User has disabled cookie extraction in UI toggle.`);
+        sendJobResponse(url, "error", "Cookie extraction disabled by user privacy toggle.");
+        return;
       }
-    } catch (e) {}
 
-    chrome.cookies.getAll({ domain: domain }, (cookies) => {
-      if (chrome.runtime.lastError) {
-        const errMsg = chrome.runtime.lastError.message;
-        appendLog("error", `Failed to fetch cookies: ${errMsg}`);
-        sendJobResponse(url, "error", errMsg);
-      } else {
-        appendLog("job", `Successfully extracted ${cookies.length} cookies for domain: ${domain}`);
-        const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join("; ");
-        sendJobResponse(url, "success", JSON.stringify({ cookies, cookieHeader }));
-      }
+      appendLog("job", `Fetching cookies for URL/Domain: ${url}`);
+      let domain = url;
+      try {
+        if (url.startsWith("http")) {
+          domain = new URL(url).hostname;
+        }
+      } catch (e) {}
+
+      chrome.cookies.getAll({ domain: domain }, (cookies) => {
+        if (chrome.runtime.lastError) {
+          const errMsg = chrome.runtime.lastError.message;
+          appendLog("error", `Failed to fetch cookies: ${errMsg}`);
+          sendJobResponse(url, "error", errMsg);
+        } else {
+          appendLog("job", `Successfully extracted ${cookies.length} cookies for domain: ${domain}`);
+          const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join("; ");
+          sendJobResponse(url, "success", JSON.stringify({ cookies, cookieHeader }));
+        }
+      });
     });
     return;
   }

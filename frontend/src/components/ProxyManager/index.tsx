@@ -38,7 +38,7 @@ export default function ProxyManager({ isExtension, onLogMessage }: ProxyManager
           name: "vproxy AutoProxy PAC",
           mode: "pac_script",
           pacType: "url",
-          pacUrl: "http://127.0.0.1:18666/autoproxy.pac",
+          pacUrl: "http://127.0.0.1:6888/proxy.pac",
           color: "#8b5cf6",
           isVproxy: true
         },
@@ -93,18 +93,25 @@ export default function ProxyManager({ isExtension, onLogMessage }: ProxyManager
     }
   };
 
+  const [toastMsg, setToastMsg] = useState<string>("");
+
   const handleTriggerVproxySync = () => {
     setIsSyncing(true);
     if (isExtension && typeof chrome !== "undefined" && chrome.runtime) {
       chrome.runtime.sendMessage({ type: "TRIGGER_VPROXY_SYNC" }, (res: any) => {
         setIsSyncing(false);
-        onLogMessage?.("system", res?.status || "Triggered vproxy scan.");
+        const msg = res?.status || "vproxy sync request dispatched.";
+        onLogMessage?.("system", msg);
+        setToastMsg("✅ vproxy rules synced successfully!");
+        setTimeout(() => setToastMsg(""), 3000);
         fetchProxyState();
       });
     } else {
       setTimeout(() => {
         setIsSyncing(false);
         onLogMessage?.("system", "Mock Mode: Triggered vproxy sync check.");
+        setToastMsg("✅ Mock vproxy sync completed!");
+        setTimeout(() => setToastMsg(""), 3000);
       }, 500);
     }
   };
@@ -255,6 +262,16 @@ export default function ProxyManager({ isExtension, onLogMessage }: ProxyManager
 
   return (
     <div className="proxy-manager-container">
+      {toastMsg && (
+        <div style={{
+          backgroundColor: '#10b981', color: '#ffffff', padding: '8px 12px', borderRadius: '6px',
+          fontSize: '12px', fontWeight: 600, marginBottom: '12px', display: 'flex', alignItems: 'center',
+          boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)', transition: 'all .3s ease'
+        }}>
+          {toastMsg}
+        </div>
+      )}
+
       {/* Active Profile Status Header */}
       <div className="panel-card active-proxy-card">
         <div className="card-header">
