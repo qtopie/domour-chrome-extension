@@ -30,8 +30,7 @@ jobs:
           cd frontend
           npm ci
           npm run build
-          zip -r ../domour-chrome-extension.zip dist/
-          cd ..
+          cd dist && zip -r ../../domour-chrome-extension.zip . && cd ..
 
       - name: Build Cross-Platform Go Binaries
         run: |
