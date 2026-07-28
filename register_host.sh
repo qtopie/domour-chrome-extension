@@ -17,6 +17,12 @@ fi
 
 chmod +x "$BINARY_PATH"
 
+if [ "$EXTENSION_ID" = "$PROD_EXTENSION_ID" ]; then
+    ALLOWED_ORIGINS="\"chrome-extension://${PROD_EXTENSION_ID}/\""
+else
+    ALLOWED_ORIGINS="\"chrome-extension://${EXTENSION_ID}/\", \"chrome-extension://${PROD_EXTENSION_ID}/\""
+fi
+
 MANIFEST_CONTENT=$(cat <<EOF
 {
   "name": "${HOST_NAME}",
@@ -24,8 +30,7 @@ MANIFEST_CONTENT=$(cat <<EOF
   "path": "${BINARY_PATH}",
   "type": "stdio",
   "allowed_origins": [
-    "chrome-extension://${EXTENSION_ID}/",
-    "chrome-extension://ndbhggifgbebojmidnoenkfpiiknkggc/"
+    ${ALLOWED_ORIGINS}
   ]
 }
 EOF
