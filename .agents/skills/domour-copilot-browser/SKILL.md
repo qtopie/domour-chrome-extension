@@ -1,5 +1,5 @@
 ---
-name: domour-copilot
+name: domour-copilot-browser
 description: "Build, debug, deploy, and manage the Domour Copilot AI Browser Automation Platform (Chrome Extension & Go Native Messaging Bridge). Trigger this skill when modifying extension background scripts, proxy PAC rules, native host registration, MCP server tools, or preparing Chrome Web Store submission."
 ---
 
