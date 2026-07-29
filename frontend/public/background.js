@@ -137,7 +137,9 @@ function applyProxyConfig(profile) {
         "*.local"
       ];
       
-      const customBypass = Array.isArray(profile.bypassList) ? profile.bypassList : [];
+      const customBypass = Array.isArray(profile.bypassList) 
+        ? profile.bypassList.map((s) => s.trim()).filter((s) => s.length > 0) 
+        : [];
       const combinedBypass = Array.from(new Set([...defaultLanBypass, ...customBypass]));
 
       config = {

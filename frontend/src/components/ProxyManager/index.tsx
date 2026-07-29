@@ -176,7 +176,10 @@ export default function ProxyManager({ isExtension, onLogMessage }: ProxyManager
       ...editingProfile,
       name: editingProfile.name.trim(),
       host: editingProfile.host?.trim(),
-      pacUrl: editingProfile.pacUrl?.trim()
+      pacUrl: editingProfile.pacUrl?.trim(),
+      bypassList: (editingProfile.bypassList || [])
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
     };
 
     if (isExtension && typeof chrome !== "undefined" && chrome.runtime) {
