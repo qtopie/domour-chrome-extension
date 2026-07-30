@@ -117,6 +117,23 @@ function applyProxyConfig(profile) {
   return new Promise((resolve, reject) => {
     let config = { mode: "direct" };
 
+    const defaultLanBypass = [
+      "localhost",
+      "localhost:*",
+      "127.0.0.1",
+      "127.0.0.1:*",
+      "[::1]",
+      "[::1]:*",
+      "<-loopback>",
+      "192.168.0.0/16",
+      "192.168.*",
+      "10.0.0.0/8",
+      "10.*",
+      "172.16.0.0/12",
+      "*.local",
+      "*.lan"
+    ];
+
     if (!profile || profile.mode === "direct") {
       config = { mode: "direct" };
     } else if (profile.mode === "system") {
@@ -125,17 +142,6 @@ function applyProxyConfig(profile) {
       const scheme = profile.scheme || "http";
       const host = profile.host || "127.0.0.1";
       const port = Number(profile.port) || 8080;
-      
-      const defaultLanBypass = [
-        "localhost",
-        "127.0.0.1",
-        "[::1]",
-        "<-loopback>",
-        "192.168.0.0/16",
-        "10.0.0.0/8",
-        "172.16.0.0/12",
-        "*.local"
-      ];
       
       const customBypass = Array.isArray(profile.bypassList) 
         ? profile.bypassList.map((s) => s.trim()).filter((s) => s.length > 0) 
@@ -487,7 +493,23 @@ function handleVproxySync(data) {
         scheme: vProfile.scheme || "http",
         host: vProfile.host || "127.0.0.1",
         port: vProfile.port || 18666,
-        bypassList: vProfile.bypassList || ["localhost", "127.0.0.1"],
+        bypassList: Array.from(new Set([
+          "localhost",
+          "localhost:*",
+          "127.0.0.1",
+          "127.0.0.1:*",
+          "[::1]",
+          "[::1]:*",
+          "<-loopback>",
+          "192.168.0.0/16",
+          "192.168.*",
+          "10.0.0.0/8",
+          "10.*",
+          "172.16.0.0/12",
+          "*.local",
+          "*.lan",
+          ...(Array.isArray(vProfile.bypassList) ? vProfile.bypassList : [])
+        ])),
         pacType: vProfile.pacScript ? "script" : (vProfile.pacType || "url"),
         pacUrl: vProfile.pacUrl || "http://127.0.0.1:6888/proxy.pac",
         pacScript: vProfile.pacScript,

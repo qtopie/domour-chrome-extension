@@ -312,7 +312,11 @@ func startEmbeddedMCPServer(port int) {
 
 		regexBlock := strings.Join(regexConditions, "\n")
 
-		pacScript := fmt.Sprintf(`var FindProxyForURL = function(init, profiles) {
+		pacScript := fmt.Sprintf(`function isPlainHostName(host) {
+    return host.indexOf('.') === -1;
+}
+
+var FindProxyForURL = function(init, profiles) {
     return function(url, host) {
         "use strict";
         var result = init, scheme = url.substr(0, url.indexOf(":"));
@@ -326,7 +330,7 @@ func startEmbeddedMCPServer(port int) {
     "+auto switch": function(url, host, scheme) {
         "use strict";
         // LAN & Localhost Bypass Rules (Never use proxy for intranet)
-        if (isPlainHostName(host) || host === '127.0.0.1' || host === 'localhost' || /(?:^|\.)local$/.test(host)) return "DIRECT";
+        if (!host || isPlainHostName(host) || host === '127.0.0.1' || host === 'localhost' || host === '::1' || /(?:^|\.)local$/.test(host)) return "DIRECT";
         if (/^(?:10|127|192\.168|172\.(?:1[6-9]|2[0-9]|3[01]))\./.test(host)) return "DIRECT";
 
 %s
