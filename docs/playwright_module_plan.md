@@ -88,3 +88,17 @@ Integrate Chrome DevTools Protocol (CDP) debugging relay, tab group management, 
 ### Manual Verification
 - Test connecting `@playwright/mcp --extension` with `PLAYWRIGHT_MCP_EXTENSION_TOKEN`.
 - Confirm tabs are automatically grouped into the `"Playwright"` green tab group and CDP commands execute properly.
+
+---
+
+## Chrome Web Store Policy Compliance Incident Note (2026-07-30)
+
+> [!WARNING]
+> **Chrome Web Store Review Rejected (`Requesting but not using: debugger`)**
+> - **Incident**: The submission version `1.0.0` was rejected by Chrome Web Store Developer Support with violation reference `Purple Potassium` (`Requesting but not using the following permission(s): debugger`).
+> - **Root Cause**: `"debugger"` permission was requested in `manifest.json`, but `background.js` did not actively invoke `chrome.debugger` APIs during extension runtime, violating the *Narrowest Permissions Policy*.
+> - **Resolution**: 
+>   1. Removed `"debugger"` from `permissions` in `manifest.json`.
+>   2. Standard automation features remain fully functional using `scripting`, `tabs`, `cookies`, `proxy`, and `nativeMessaging` APIs.
+>   3. Bumped extension version to `1.0.1` for re-submission.
+

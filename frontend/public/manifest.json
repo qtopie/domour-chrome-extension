@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Domour Copilot Extension",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Secure Edge Extension AI Browser Automation Bridge",
   "permissions": [
     "sidePanel",
@@ -10,7 +10,6 @@
     "tabs",
     "activeTab",
     "proxy",
-    "debugger",
     "tabGroups",
     "nativeMessaging",
     "cookies"
