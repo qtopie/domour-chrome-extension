@@ -38,7 +38,7 @@ export default function ProxyManager({ isExtension, onLogMessage }: ProxyManager
           name: "vproxy AutoProxy PAC",
           mode: "pac_script",
           pacType: "url",
-          pacUrl: "http://127.0.0.1:6888/proxy.pac",
+          pacUrl: "http://127.0.0.1:26888/proxy.pac",
           color: "#8b5cf6",
           isVproxy: true
         },

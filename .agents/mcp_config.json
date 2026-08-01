@@ -1,7 +1,10 @@
 {
   "mcpServers": {
     "domour-chrome-mcp": {
-      "url": "http://localhost:6888/mcp"
+      "url": "http://localhost:26888/mcp",
+      "headers": {
+        "Authorization": "Bearer tk_22266e38311c82c36af401b9a9da4d"
+      }
     }
   }
 }

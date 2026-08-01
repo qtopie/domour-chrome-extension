@@ -9,7 +9,7 @@ A high-performance, extension-first browser automation platform using a **React 
 The platform operates seamlessly across three distinct components:
 1. **Frontend UI (Chrome Side Panel)**: Built using React (Vite + TypeScript). It manages active proxy profiles, toggles privacy permissions, shows native bridge connection status, and displays live scrolling execution logs.
 2. **Background Service Worker (`background.js`)**: An MV3 service worker that maintains a native port to Go, executes automation scripting, applies dynamic Chromium proxy settings (`chrome.proxy`), and intercepts heartbeats.
-3. **Local Bridge Engine (`main.go`)**: A native Go binary that interacts via standard I/O (using 4-byte little-endian length prefixes). It embeds a Streamable HTTP & Stdio MCP Server (Port `6888`) and dynamically parses local `vproxy` configurations into high-performance SwitchyOmega-style PAC scripts (`/proxy.pac`).
+3. **Local Bridge Engine (`main.go`)**: A native Go binary that interacts via standard I/O (using 4-byte little-endian length prefixes). It embeds a Streamable HTTP & Stdio MCP Server (Port `26888`) and dynamically parses local `vproxy` configurations into high-performance SwitchyOmega-style PAC scripts (`/proxy.pac`).
 
 ---
 
@@ -87,9 +87,9 @@ Allow Chrome to communicate with your compiled Go binary by running the registra
 ### Step 4: Open Side Panel & Connect AI Agents
 
 1. Click the **Domour Copilot** extension icon in your browser toolbar to open the Side Panel.
-2. Opening the Side Panel automatically launches the Go daemon and starts local services on **Port `6888`**:
-   - 🤖 **Streamable HTTP MCP Endpoint**: `http://localhost:6888/mcp`
-   - 📄 **Dynamic PAC Proxy Endpoint**: `http://localhost:6888/proxy.pac`
+2. Opening the Side Panel automatically launches the Go daemon and starts local services on **Port `26888`**:
+   - 🤖 **Streamable HTTP MCP Endpoint**: `http://localhost:26888/mcp`
+   - 📄 **Dynamic PAC Proxy Endpoint**: `http://localhost:26888/proxy.pac`
 
 3. Add the MCP server configuration to your AI Coding Assistants (Cursor, Claude Desktop, Antigravity):
 
@@ -97,7 +97,7 @@ Allow Chrome to communicate with your compiled Go binary by running the registra
 {
   "mcpServers": {
     "domour-chrome-mcp": {
-      "url": "http://localhost:6888/mcp"
+      "url": "http://localhost:26888/mcp"
     }
   }
 }
@@ -110,7 +110,7 @@ Allow Chrome to communicate with your compiled Go binary by running the registra
 ### 1. Browser Navigation Tool (`browser_navigate`)
 Scrapes text, title, and page metrics using your authentic browser context without CDP:
 ```bash
-curl -X POST http://localhost:6888/mcp \
+curl -X POST http://localhost:26888/mcp \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -126,7 +126,7 @@ curl -X POST http://localhost:6888/mcp \
 ### 2. Vision Screenshot Tool (`browser_take_screenshot`)
 Captures full-page screenshots as native MCP `image/png` response nodes, saving up to 99% of LLM context window tokens:
 ```bash
-curl -X POST http://localhost:6888/mcp \
+curl -X POST http://localhost:26888/mcp \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -142,7 +142,7 @@ curl -X POST http://localhost:6888/mcp \
 ### 3. Dynamic SwitchyOmega PAC Service (`/proxy.pac`)
 Parses `~/.vproxy/config.json` on-the-fly and generates SwitchyOmega closure-style PAC rules with automatic intranet/LAN bypass (192.168.x.x, 10.x.x.x, 172.16-31.x.x, *.local):
 ```bash
-curl -i http://localhost:6888/proxy.pac
+curl -i http://localhost:26888/proxy.pac
 ```
 
 ---

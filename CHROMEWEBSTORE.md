@@ -15,14 +15,14 @@ Domour Copilot is an extension-first AI browser automation platform designed to 
 
 Key Features:
 - Native Automation Engine: Execute silent web navigation, text extraction, and page scraping using your authentic browser context without CDP/debugging ports.
-- Native MCP Server Integration: Built-in Stdio and Streamable HTTP (Port 6888) MCP servers for AI agents (Cursor, Claude, Antigravity).
+- Native MCP Server Integration: Built-in Stdio and Streamable HTTP (Port 26888) MCP servers for AI agents (Cursor, Claude, Antigravity).
 - Low-Token Vision Screenshots: Native image/png MCP response node for LLM vision models, saving up to 99% of context window tokens.
 - Dynamic PAC Proxy Management: Auto-syncs with local vproxy configurations, supporting SOCKS5 failovers, domain routing, and automatic LAN bypass.
 - Privacy-First Protection: One-click UI toggle to control sensitive cookie extraction permissions.
 
 How to Use:
 1. Load unpacked extension and launch the Side Panel.
-2. Connect your favorite AI Agent via Stdio or Streamable HTTP endpoint (http://localhost:6888/mcp).
+2. Connect your favorite AI Agent via Stdio or Streamable HTTP endpoint (http://localhost:26888/mcp).
 3. Automate web tasks safely and securely.
 
 **Category** [REQUIRED]

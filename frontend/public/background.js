@@ -79,6 +79,14 @@ function connectToNative() {
   });
 }
 
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === "local" && changes.api_token && changes.api_token.newValue) {
+    appendLog("system", "API token updated in storage. Connecting to native bridge...");
+    connectToNative();
+  }
+});
+
+
 // Default Proxy Profiles Seeding
 const DEFAULT_PROFILES = [
   {
@@ -93,7 +101,7 @@ const DEFAULT_PROFILES = [
     name: "vproxy AutoProxy PAC",
     mode: "pac_script",
     pacType: "url",
-    pacUrl: "http://127.0.0.1:6888/proxy.pac",
+    pacUrl: "http://127.0.0.1:26888/proxy.pac",
     color: "#8b5cf6",
     isVproxy: true,
     updatedAt: Date.now()
@@ -442,9 +450,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       });
     });
     return true; // async
+  } else if (message.type === "TRIGGER_CONNECT") {
+    connectToNative();
+    sendResponse({ success: true, connected: !!nativePort });
+    return true;
   }
 
   return true;
+
 });
 
 // Handles native messaging packets from Go
@@ -511,7 +524,7 @@ function handleVproxySync(data) {
           ...(Array.isArray(vProfile.bypassList) ? vProfile.bypassList : [])
         ])),
         pacType: vProfile.pacScript ? "script" : (vProfile.pacType || "url"),
-        pacUrl: vProfile.pacUrl || "http://127.0.0.1:6888/proxy.pac",
+        pacUrl: vProfile.pacUrl || "http://127.0.0.1:26888/proxy.pac",
         pacScript: vProfile.pacScript,
         color: vProfile.color || "#8b5cf6",
         isVproxy: true,
@@ -603,6 +616,162 @@ function executeAutomationJob(job) {
       }
       chrome.tabs.onUpdated.addListener(screenshotListener);
     });
+    return;
+  }
+
+  if (action === "NAVIGATE_BACK") {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs.length > 0 && tabs[0].id) {
+        chrome.tabs.goBack(tabs[0].id, () => {
+          sendJobResponse(url, "success", "Navigated back successfully");
+        });
+      } else {
+        sendJobResponse(url, "error", "No active tab to navigate back");
+      }
+    });
+    return;
+  }
+
+  // Common tab runner for DOM automation tasks
+  const runDomScript = (scriptFunc, args = []) => {
+    appendLog("job", `Executing DOM action [${action}] on URL: ${url}`);
+    chrome.tabs.create({ url: url, active: true }, (tab) => {
+      if (!tab || !tab.id) {
+        sendJobResponse(url, "error", "Failed to create tab for DOM action");
+        return;
+      }
+      const tabId = tab.id;
+
+      function updateListener(updatedTabId, changeInfo) {
+        if (updatedTabId === tabId && changeInfo.status === "complete") {
+          chrome.tabs.onUpdated.removeListener(updateListener);
+          setTimeout(() => {
+            chrome.scripting.executeScript({
+              target: { tabId: tabId },
+              func: scriptFunc,
+              args: args
+            }, (results) => {
+              if (chrome.runtime.lastError) {
+                const errMsg = chrome.runtime.lastError.message;
+                appendLog("error", `Script execution failed: ${errMsg}`);
+                sendJobResponse(url, "error", `Script execution failed: ${errMsg}`);
+              } else if (results && results[0]) {
+                const resData = results[0].result;
+                sendJobResponse(url, "success", typeof resData === "string" ? resData : JSON.stringify(resData));
+              } else {
+                sendJobResponse(url, "success", "OK");
+              }
+              chrome.tabs.remove(tabId).catch(() => {});
+            });
+          }, 500);
+        }
+      }
+      chrome.tabs.onUpdated.addListener(updateListener);
+    });
+  };
+
+  if (action === "CLICK_ELEMENT") {
+    const selector = job.selector || "";
+    runDomScript((sel) => {
+      let el = document.querySelector(sel);
+      if (!el) {
+        // Fallback: search by text content if selector is not CSS
+        const all = Array.from(document.querySelectorAll('a, button, input, [role="button"]'));
+        el = all.find(e => e.innerText.includes(sel) || (e.value && e.value.includes(sel)));
+      }
+      if (!el) return `Element not found for selector/text: ${sel}`;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.click();
+      return `Clicked element: ${sel}`;
+    }, [selector]);
+    return;
+  }
+
+  if (action === "TYPE_TEXT" || action === "FILL_FORM") {
+    const selector = job.selector || "";
+    const textVal = action === "TYPE_TEXT" ? (job.text || "") : (job.value || "");
+    runDomScript((sel, val) => {
+      const el = document.querySelector(sel);
+      if (!el) return `Element not found: ${sel}`;
+      el.focus();
+      el.value = val;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      return `Filled value in ${sel}`;
+    }, [selector, textVal]);
+    return;
+  }
+
+  if (action === "SELECT_OPTION") {
+    const selector = job.selector || "";
+    const val = job.value || "";
+    runDomScript((sel, targetVal) => {
+      const el = document.querySelector(sel);
+      if (!el) return `Select element not found: ${sel}`;
+      if (el.tagName.toLowerCase() === 'select') {
+        for (let i = 0; i < el.options.length; i++) {
+          if (el.options[i].value === targetVal || el.options[i].text.includes(targetVal)) {
+            el.selectedIndex = i;
+            break;
+          }
+        }
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        return `Selected option ${targetVal} in ${sel}`;
+      }
+      return `Element ${sel} is not a <select>`;
+    }, [selector, val]);
+    return;
+  }
+
+  if (action === "PRESS_KEY") {
+    const selector = job.selector || "body";
+    const keyName = job.key || "Enter";
+    runDomScript((sel, key) => {
+      const el = document.querySelector(sel) || document.body;
+      el.dispatchEvent(new KeyboardEvent('keydown', { key: key, bubbles: true }));
+      el.dispatchEvent(new KeyboardEvent('keyup', { key: key, bubbles: true }));
+      return `Pressed key ${key} on ${sel}`;
+    }, [selector, keyName]);
+    return;
+  }
+
+  if (action === "HOVER_ELEMENT") {
+    const selector = job.selector || "";
+    runDomScript((sel) => {
+      const el = document.querySelector(sel);
+      if (!el) return `Element not found: ${sel}`;
+      el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+      el.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+      return `Hovered over ${sel}`;
+    }, [selector]);
+    return;
+  }
+
+  if (action === "GET_SNAPSHOT") {
+    const selector = job.selector || "";
+    runDomScript((sel) => {
+      const root = sel ? document.querySelector(sel) : document.documentElement;
+      if (!root) return `Element not found: ${sel}`;
+      return {
+        title: document.title,
+        url: window.location.href,
+        html: root.outerHTML.substring(0, 50000),
+        text: root.innerText ? root.innerText.substring(0, 10000) : ""
+      };
+    }, [selector]);
+    return;
+  }
+
+  if (action === "EVALUATE_JS") {
+    const expr = job.expression || "";
+    runDomScript((code) => {
+      try {
+        const result = eval(code);
+        return { success: true, result: String(result) };
+      } catch (err) {
+        return { success: false, error: String(err) };
+      }
+    }, [expr]);
     return;
   }
 

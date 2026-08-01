@@ -138,7 +138,7 @@ func main() {
 	go startVproxyPolling()
 
 	// 4. Embedded Streamable HTTP MCP Server
-	go startEmbeddedMCPServer(6888)
+	go startEmbeddedMCPServer(26888)
 
 	// 5. Main Event Loop: Native Messaging Pipe Reader
 	for {
@@ -174,7 +174,7 @@ func main() {
 }
 
 // Memory Job Dispatcher directly sends payload to Chrome via Native Pipe
-func dispatchJobToBrowser(action, targetURL string) (ChromeMessage, error) {
+func dispatchJobToBrowser(action, targetURL string, extra ...map[string]string) (ChromeMessage, error) {
 	tokenLock.RLock()
 	currentValidToken := validToken
 	tokenLock.RUnlock()
@@ -185,6 +185,12 @@ func dispatchJobToBrowser(action, targetURL string) (ChromeMessage, error) {
 		"action": action,
 		"url":    targetURL,
 	}
+	if len(extra) > 0 && extra[0] != nil {
+		for k, v := range extra[0] {
+			jobPayload[k] = v
+		}
+	}
+
 	payloadBytes, err := json.Marshal(jobPayload)
 	if err != nil {
 		return ChromeMessage{}, err
@@ -210,10 +216,29 @@ func dispatchJobToBrowser(action, targetURL string) (ChromeMessage, error) {
 func startEmbeddedMCPServer(port int) {
 	http.HandleFunc("/mcp", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
 		if r.Method == "OPTIONS" {
 			return
+		}
+
+		// Check Token authentication if validToken is locked in memory
+		currentValidToken := validToken
+		if currentValidToken != "" {
+			authHeader := r.Header.Get("Authorization")
+			tokenParam := r.URL.Query().Get("token")
+			providedToken := ""
+
+			if strings.HasPrefix(authHeader, "Bearer ") {
+				providedToken = strings.TrimPrefix(authHeader, "Bearer ")
+			} else if tokenParam != "" {
+				providedToken = tokenParam
+			}
+
+			if providedToken != currentValidToken {
+				http.Error(w, `{"error":"Unauthorized: Invalid Token"}`, http.StatusUnauthorized)
+				return
+			}
 		}
 
 		if r.Method == "POST" {
@@ -366,14 +391,182 @@ func getToolsList() []MCPTool {
 			},
 		},
 		{
+			Name:        "browser_navigate_back",
+			Description: "Go back to the previous page in history on the active browser tab.",
+			InputSchema: map[string]interface{}{
+				"type":       "object",
+				"properties": map[string]interface{}{},
+			},
+		},
+		{
+			Name:        "browser_click",
+			Description: "Click on an element on the webpage matching the CSS selector or text description.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"url": map[string]interface{}{
+						"type":        "string",
+						"description": "Target Web URL",
+					},
+					"selector": map[string]interface{}{
+						"type":        "string",
+						"description": "CSS selector or element text to click",
+					},
+				},
+				"required": []string{"url", "selector"},
+			},
+		},
+		{
+			Name:        "browser_type",
+			Description: "Type text into an input field or element matching the CSS selector.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"url": map[string]interface{}{
+						"type":        "string",
+						"description": "Target Web URL",
+					},
+					"selector": map[string]interface{}{
+						"type":        "string",
+						"description": "CSS selector for the input element",
+					},
+					"text": map[string]interface{}{
+						"type":        "string",
+						"description": "Text string to type into the field",
+					},
+				},
+				"required": []string{"url", "selector", "text"},
+			},
+		},
+		{
+			Name:        "browser_fill_form",
+			Description: "Fill out an input form element with a value.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"url": map[string]interface{}{
+						"type":        "string",
+						"description": "Target Web URL",
+					},
+					"selector": map[string]interface{}{
+						"type":        "string",
+						"description": "CSS selector for form input",
+					},
+					"value": map[string]interface{}{
+						"type":        "string",
+						"description": "Value to set in the input field",
+					},
+				},
+				"required": []string{"url", "selector", "value"},
+			},
+		},
+		{
+			Name:        "browser_select_option",
+			Description: "Select an option in a <select> element.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"url": map[string]interface{}{
+						"type":        "string",
+						"description": "Target Web URL",
+					},
+					"selector": map[string]interface{}{
+						"type":        "string",
+						"description": "CSS selector for <select> element",
+					},
+					"value": map[string]interface{}{
+						"type":        "string",
+						"description": "Option value or text to select",
+					},
+				},
+				"required": []string{"url", "selector", "value"},
+			},
+		},
+		{
+			Name:        "browser_press_key",
+			Description: "Send a key press event (e.g. Enter, Tab, Escape, ArrowDown) to an element or page.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"url": map[string]interface{}{
+						"type":        "string",
+						"description": "Target Web URL",
+					},
+					"key": map[string]interface{}{
+						"type":        "string",
+						"description": "Key name to press (Enter, Tab, Escape, etc.)",
+					},
+					"selector": map[string]interface{}{
+						"type":        "string",
+						"description": "Optional CSS selector to target before pressing key",
+					},
+				},
+				"required": []string{"url", "key"},
+			},
+		},
+		{
+			Name:        "browser_hover",
+			Description: "Hover mouse over an element matching the CSS selector.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"url": map[string]interface{}{
+						"type":        "string",
+						"description": "Target Web URL",
+					},
+					"selector": map[string]interface{}{
+						"type":        "string",
+						"description": "CSS selector to hover over",
+					},
+				},
+				"required": []string{"url", "selector"},
+			},
+		},
+		{
+			Name:        "browser_snapshot",
+			Description: "Get the HTML DOM structure / interactive accessibility tree of the page.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"url": map[string]interface{}{
+						"type":        "string",
+						"description": "Target Web URL",
+					},
+					"selector": map[string]interface{}{
+						"type":        "string",
+						"description": "Optional sub-tree CSS selector",
+					},
+				},
+				"required": []string{"url"},
+			},
+		},
+		{
+			Name:        "browser_evaluate",
+			Description: "Evaluate a custom JavaScript expression in the web page context and return the result.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"url": map[string]interface{}{
+						"type":        "string",
+						"description": "Target Web URL",
+					},
+					"expression": map[string]interface{}{
+						"type":        "string",
+						"description": "JavaScript code string to evaluate",
+					},
+				},
+				"required": []string{"url", "expression"},
+			},
+		},
+		{
 			Name:        "browser_get_cookies",
-			Description: "Extract authentication cookies (e.g. for leetcode.com) from authentic browser session.",
+			Description: "Extract authentication cookies from authentic browser session.",
 			InputSchema: map[string]interface{}{
 				"type": "object",
 				"properties": map[string]interface{}{
 					"domain": map[string]interface{}{
 						"type":        "string",
-						"description": "Domain or URL to fetch cookies for (e.g. leetcode.com)",
+						"description": "Domain or URL to fetch cookies for",
 					},
 				},
 				"required": []string{"domain"},
@@ -397,9 +590,27 @@ func getToolsList() []MCPTool {
 }
 
 func handleCallTool(params CallToolParams) (interface{}, error) {
+	strArg := func(k string) string {
+		if v, ok := params.Arguments[k].(string); ok {
+			return v
+		}
+		return ""
+	}
+
+	makeRes := func(data string) (interface{}, error) {
+		return map[string]interface{}{
+			"content": []map[string]interface{}{
+				{
+					"type": "text",
+					"text": data,
+				},
+			},
+		}, nil
+	}
+
 	switch params.Name {
 	case "browser_navigate":
-		targetURL, _ := params.Arguments["url"].(string)
+		targetURL := strArg("url")
 		if targetURL == "" {
 			return nil, fmt.Errorf("missing 'url' argument")
 		}
@@ -407,17 +618,117 @@ func handleCallTool(params CallToolParams) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		return map[string]interface{}{
-			"content": []map[string]interface{}{
-				{
-					"type": "text",
-					"text": resMsg.Data,
-				},
-			},
-		}, nil
+		return makeRes(resMsg.Data)
+
+	case "browser_navigate_back":
+		resMsg, err := dispatchJobToBrowser("NAVIGATE_BACK", "")
+		if err != nil {
+			return nil, err
+		}
+		return makeRes(resMsg.Data)
+
+	case "browser_click":
+		url := strArg("url")
+		selector := strArg("selector")
+		if url == "" || selector == "" {
+			return nil, fmt.Errorf("missing 'url' or 'selector' argument")
+		}
+		resMsg, err := dispatchJobToBrowser("CLICK_ELEMENT", url, map[string]string{"selector": selector})
+		if err != nil {
+			return nil, err
+		}
+		return makeRes(resMsg.Data)
+
+	case "browser_type":
+		url := strArg("url")
+		selector := strArg("selector")
+		text := strArg("text")
+		if url == "" || selector == "" {
+			return nil, fmt.Errorf("missing 'url' or 'selector' argument")
+		}
+		resMsg, err := dispatchJobToBrowser("TYPE_TEXT", url, map[string]string{"selector": selector, "text": text})
+		if err != nil {
+			return nil, err
+		}
+		return makeRes(resMsg.Data)
+
+	case "browser_fill_form":
+		url := strArg("url")
+		selector := strArg("selector")
+		value := strArg("value")
+		if url == "" || selector == "" {
+			return nil, fmt.Errorf("missing 'url' or 'selector' argument")
+		}
+		resMsg, err := dispatchJobToBrowser("FILL_FORM", url, map[string]string{"selector": selector, "value": value})
+		if err != nil {
+			return nil, err
+		}
+		return makeRes(resMsg.Data)
+
+	case "browser_select_option":
+		url := strArg("url")
+		selector := strArg("selector")
+		value := strArg("value")
+		if url == "" || selector == "" {
+			return nil, fmt.Errorf("missing 'url' or 'selector' argument")
+		}
+		resMsg, err := dispatchJobToBrowser("SELECT_OPTION", url, map[string]string{"selector": selector, "value": value})
+		if err != nil {
+			return nil, err
+		}
+		return makeRes(resMsg.Data)
+
+	case "browser_press_key":
+		url := strArg("url")
+		key := strArg("key")
+		selector := strArg("selector")
+		if url == "" || key == "" {
+			return nil, fmt.Errorf("missing 'url' or 'key' argument")
+		}
+		resMsg, err := dispatchJobToBrowser("PRESS_KEY", url, map[string]string{"key": key, "selector": selector})
+		if err != nil {
+			return nil, err
+		}
+		return makeRes(resMsg.Data)
+
+	case "browser_hover":
+		url := strArg("url")
+		selector := strArg("selector")
+		if url == "" || selector == "" {
+			return nil, fmt.Errorf("missing 'url' or 'selector' argument")
+		}
+		resMsg, err := dispatchJobToBrowser("HOVER_ELEMENT", url, map[string]string{"selector": selector})
+		if err != nil {
+			return nil, err
+		}
+		return makeRes(resMsg.Data)
+
+	case "browser_snapshot":
+		url := strArg("url")
+		selector := strArg("selector")
+		if url == "" {
+			return nil, fmt.Errorf("missing 'url' argument")
+		}
+		resMsg, err := dispatchJobToBrowser("GET_SNAPSHOT", url, map[string]string{"selector": selector})
+		if err != nil {
+			return nil, err
+		}
+		return makeRes(resMsg.Data)
+
+	case "browser_evaluate":
+		url := strArg("url")
+		expr := strArg("expression")
+		if url == "" || expr == "" {
+			return nil, fmt.Errorf("missing 'url' or 'expression' argument")
+		}
+		resMsg, err := dispatchJobToBrowser("EVALUATE_JS", url, map[string]string{"expression": expr})
+		if err != nil {
+			return nil, err
+		}
+		return makeRes(resMsg.Data)
 
 	case "browser_get_cookies":
-		domain, _ := params.Arguments["domain"].(string)
+		domain := strArg("domain")
 		if domain == "" {
 			return nil, fmt.Errorf("missing 'domain' argument")
 		}
@@ -425,17 +736,10 @@ func handleCallTool(params CallToolParams) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		return map[string]interface{}{
-			"content": []map[string]interface{}{
-				{
-					"type": "text",
-					"text": resMsg.Data,
-				},
-			},
-		}, nil
+		return makeRes(resMsg.Data)
 
 	case "browser_take_screenshot":
-		targetURL, _ := params.Arguments["url"].(string)
+		targetURL := strArg("url")
 		if targetURL == "" {
 			return nil, fmt.Errorf("missing 'url' argument")
 		}
@@ -443,14 +747,7 @@ func handleCallTool(params CallToolParams) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		return map[string]interface{}{
-			"content": []map[string]interface{}{
-				{
-					"type": "text",
-					"text": resMsg.Data,
-				},
-			},
-		}, nil
+		return makeRes(resMsg.Data)
 
 	default:
 		return nil, fmt.Errorf("unknown tool: %s", params.Name)
