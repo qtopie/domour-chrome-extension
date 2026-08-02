@@ -1,27 +1,42 @@
-# Compiles binaries
+# Compiles binaries & Executables
 bin/
 *.exe
 *.test
 *.prof
 
-# Frontend dependencies and builds
+# Node & Frontend dependencies and builds
+node_modules/
 frontend/node_modules/
 frontend/dist/
+frontend/.tmp/
 frontend/.svelte-kit/
 frontend/.next/
 frontend/out/
 
-# Chrome runtime environment
+# Browser profiles, runtime cache, & session data
 .chrome-profile/
 .edge-profile/
+.edge-profile-*/
+.playwright/
+.playwright-cli/
+.test/
 .task/
 .DS_Store
 
-# Temporary screenshots & zip
-screenshot.png
-screenshot_1280x800.png
+# Temporary outputs, logs, & debug artifacts
+*.log
+*.png
+*.zip
+bridge.log
+cdp_nosandbox.log
+chrome_cdp.log
+test_cdp.log
+screenshot*.png
 domour-chrome-extension.zip
 
-# Logs
-*.log
-bridge.log
+# Temporary test scripts
+playwright_test.js
+test_youtube_proxy.js
+
+# Agent task temporary state
+.agents/TASK.md
