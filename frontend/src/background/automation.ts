@@ -1,5 +1,33 @@
 import { appendLog } from './logger';
 
+const TAB_DRAG_RETRY_DELAYS = [150, 300, 600];
+
+function createTabWithRetry(
+  createProperties: chrome.tabs.CreateProperties,
+  callback: (tab: chrome.tabs.Tab | undefined) => void
+): void {
+  let attempt = 0;
+  const tryCreate = (): void => {
+    chrome.tabs.create(createProperties, (tab) => {
+      if (chrome.runtime.lastError) {
+        const errMsg = chrome.runtime.lastError.message ?? 'Unknown error';
+        // Chrome locks tab-strip edits while the user is dragging a tab;
+        // the failure is transient, so retry with short backoff.
+        if (errMsg.includes('may be dragging a tab') && attempt < TAB_DRAG_RETRY_DELAYS.length) {
+          const delay = TAB_DRAG_RETRY_DELAYS[attempt++];
+          setTimeout(tryCreate, delay);
+          return;
+        }
+        appendLog("error", `Failed to create tab: ${errMsg}`);
+        callback(undefined);
+        return;
+      }
+      callback(tab);
+    });
+  };
+  tryCreate();
+}
+
 export function executeAutomationJob(
   job: any,
   sendJobResponse: (url: string, status: string, data: any) => void
@@ -40,18 +68,20 @@ export function executeAutomationJob(
 
   if (action === "TAKE_SCREENSHOT") {
     appendLog("job", `Taking screenshot for URL: ${url}`);
-    chrome.tabs.create({ url: url, active: true }, (tab) => {
+    createTabWithRetry({ url: url, active: true }, (tab) => {
       if (!tab || !tab.id) {
         sendJobResponse(url, "error", "Failed to create tab for screenshot");
         return;
       }
+      const tabId = tab.id;
+      const windowId = tab.windowId;
 
       function screenshotListener(updatedTabId: number, changeInfo: any) {
-        if (updatedTabId === tab.id && changeInfo.status === "complete") {
+        if (updatedTabId === tabId && changeInfo.status === "complete") {
           chrome.tabs.onUpdated.removeListener(screenshotListener);
           setTimeout(() => {
-            if (tab.windowId !== undefined) {
-              chrome.tabs.captureVisibleTab(tab.windowId, { format: "png" }, (dataUrl) => {
+            if (windowId !== undefined) {
+              chrome.tabs.captureVisibleTab(windowId, { format: "png" }, (dataUrl) => {
                 if (chrome.runtime.lastError) {
                   const errMsg = chrome.runtime.lastError.message;
                   appendLog("error", `Screenshot capture failed: ${errMsg}`);
@@ -60,7 +90,7 @@ export function executeAutomationJob(
                   appendLog("job", `Successfully captured screenshot for ${url}`);
                   sendJobResponse(url, "success", JSON.stringify({ dataUrl, url }));
                 }
-                if (tab.id !== undefined) chrome.tabs.remove(tab.id).catch(() => {});
+                chrome.tabs.remove(tabId).catch(() => {});
               });
             }
           }, 1000);
@@ -93,7 +123,7 @@ export function executeAutomationJob(
   // Common tab runner for DOM automation tasks with SPA wait support
   const runDomScript = (scriptFunc: Function, args: any[] = [], jobOptions: any = {}) => {
     appendLog("job", `Executing DOM action [${action}] on URL: ${url}`);
-    chrome.tabs.create({ url: url, active: true }, (tab) => {
+    createTabWithRetry({ url: url, active: true }, (tab) => {
       if (!tab || !tab.id) {
         sendJobResponse(url, "error", "Failed to create tab for DOM action");
         return;
@@ -280,7 +310,7 @@ export function executeAutomationJob(
 
   appendLog("job", `Opening target URL: ${url}`);
 
-  chrome.tabs.create({ url: url, active: false }, (tab) => {
+  createTabWithRetry({ url: url, active: false }, (tab) => {
     if (!tab || !tab.id) {
       appendLog("error", "Failed to create tab for automation.");
       sendJobResponse(url, "error", "Failed to create tab");
