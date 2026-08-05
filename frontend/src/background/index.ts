@@ -1,10 +1,12 @@
 import { appendLog, notifyPanelStatus } from './logger';
+import type { BridgeDisconnectReason } from './logger';
 import { executeAutomationJob } from './automation';
 import { initProxyState, applyProxyConfig, DEFAULT_PROFILES } from './proxy';
 import type { ChromeMessage, ProxyProfile } from './types';
 
 let nativePort: chrome.runtime.Port | null = null;
 let reconnectTimer: any = null;
+let lastDisconnectReason: BridgeDisconnectReason = "DISCONNECTED";
 
 function connectToNative(): void {
   if (nativePort) {
@@ -27,15 +29,23 @@ function connectToNative(): void {
 
       nativePort.onDisconnect.addListener(() => {
         const err = chrome.runtime.lastError;
-        appendLog("error", `Native bridge disconnected: ${err ? err.message : "No detailed error"}`);
+        const errMsg = err?.message ?? "";
+        const reason: BridgeDisconnectReason = errMsg.toLowerCase().includes("not found")
+          ? "NOT_INSTALLED"
+          : "DISCONNECTED";
+        lastDisconnectReason = reason;
+        appendLog("error", `Native bridge disconnected: ${err ? err.message : "No detailed error"} [${reason}]`);
         nativePort = null;
-        notifyPanelStatus(false);
+        notifyPanelStatus(false, reason);
 
         if (reconnectTimer) clearTimeout(reconnectTimer);
-        reconnectTimer = setTimeout(() => {
-          appendLog("system", "Attempting to reconnect to Native Bridge...");
-          connectToNative();
-        }, 5000);
+        // Only auto-reconnect if it was a crash/disconnect, not a missing host
+        if (reason === "DISCONNECTED") {
+          reconnectTimer = setTimeout(() => {
+            appendLog("system", "Attempting to reconnect to Native Bridge...");
+            connectToNative();
+          }, 5000);
+        }
       });
 
       appendLog("system", "Sending INITIAL_AUTH authentication payload to Go backend...");
@@ -47,7 +57,8 @@ function connectToNative(): void {
 
     } catch (e: any) {
       appendLog("error", `Exception starting native messaging connection: ${e.message}`);
-      notifyPanelStatus(false);
+      lastDisconnectReason = "DISCONNECTED";
+      notifyPanelStatus(false, "DISCONNECTED");
     }
   });
 }
@@ -161,7 +172,7 @@ function handleVproxySync(data: ChromeMessage): void {
 // Global Message Handlers
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === "CHECK_CONNECTION") {
-    sendResponse({ connected: !!nativePort });
+    sendResponse({ connected: !!nativePort, reason: nativePort ? undefined : lastDisconnectReason });
     return true;
   }
   if (message.type === "GET_PROXY_STATE") {

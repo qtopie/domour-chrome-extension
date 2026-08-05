@@ -3,12 +3,11 @@ import { useState, useEffect } from "react";
 declare const chrome: any;
 
 interface PlaywrightManagerProps {
-  token: string;
   isExtension: boolean;
   onLogMessage?: (level: string, message: string) => void;
 }
 
-export default function PlaywrightManager({ token, isExtension, onLogMessage }: PlaywrightManagerProps) {
+export default function PlaywrightManager({ isExtension, onLogMessage }: PlaywrightManagerProps) {
   const [copiedToken, setCopiedToken] = useState<boolean>(false);
   const [copiedSnippet, setCopiedSnippet] = useState<boolean>(false);
   const [connectedTabs, setConnectedTabs] = useState<number[]>([]);
@@ -33,21 +32,13 @@ export default function PlaywrightManager({ token, isExtension, onLogMessage }: 
     }
   }, [isExtension]);
 
-  const copyToken = () => {
-    navigator.clipboard.writeText(token).then(() => {
-      setCopiedToken(true);
-      setTimeout(() => setCopiedToken(false), 2000);
-    });
-  };
+
+  const MCP_ENDPOINT = "http://localhost:26888/mcp";
 
   const mcpConfigSnippet = JSON.stringify({
     mcpServers: {
-      "playwright-extension": {
-        command: "npx",
-        args: ["@playwright/mcp@latest", "--extension"],
-        env: {
-          PLAYWRIGHT_MCP_EXTENSION_TOKEN: token
-        }
+      "domour-chrome-mcp": {
+        url: MCP_ENDPOINT
       }
     }
   }, null, 2);
@@ -65,13 +56,13 @@ export default function PlaywrightManager({ token, isExtension, onLogMessage }: 
         if (res && res.success) {
           setIsRelayActive(false);
           setConnectedTabs([]);
-          onLogMessage?.("system", "Disconnected Playwright MCP client.");
+          onLogMessage?.("system", "Disconnected domour-chrome-mcp client.");
         }
       });
     } else {
       setIsRelayActive(false);
       setConnectedTabs([]);
-      onLogMessage?.("system", "Mock Mode: Playwright client disconnected.");
+      onLogMessage?.("system", "Mock Mode: MCP client disconnected.");
     }
   };
 
@@ -101,7 +92,7 @@ export default function PlaywrightManager({ token, isExtension, onLogMessage }: 
       {/* Active Native Automation Relay Card */}
       <div className={`panel-card playwright-card ${isRelayActive ? "active-relay" : ""}`}>
         <div className="card-header">
-          <h2 className="card-title">Native Automation Engine</h2>
+          <h2 className="card-title">Domour Chrome MCP</h2>
           <span className={`status-badge ${isRelayActive ? "active" : ""}`}>
             <span className={`status-dot ${isRelayActive ? "active" : "offline"}`} />
             <span className="status-text">{isRelayActive ? "ATTACHED" : "READY"}</span>
@@ -120,12 +111,12 @@ export default function PlaywrightManager({ token, isExtension, onLogMessage }: 
                 <span className="info-val font-mono">{connectedTabs.length} Active Tab(s)</span>
               </div>
               <button onClick={handleDisconnect} className="disconnect-btn">
-                Disconnect Automation Relay
+                Disconnect MCP Client
               </button>
             </>
           ) : (
             <p className="card-desc">
-              Native Go Bridge Client is ready. Send jobs via `domour-chrome-cli` or API to automate browser actions & cookies seamlessly.
+              MCP server is ready on <code style={{ color: "var(--info)", fontFamily: "var(--font-mono)", fontSize: "0.75rem" }}>localhost:26888</code>. Connect your AI agent using the config snippet below.
             </p>
           )}
         </div>
@@ -164,20 +155,27 @@ export default function PlaywrightManager({ token, isExtension, onLogMessage }: 
         </div>
       </div>
 
-      {/* Playwright MCP Token Authentication Lock */}
+      {/* MCP Endpoint Info Card */}
       <div className="panel-card">
         <div className="card-header">
-          <h2 className="card-title">PLAYWRIGHT_MCP_EXTENSION_TOKEN</h2>
-          <button onClick={copyToken} className="copy-btn-text">
-            {copiedToken ? "Copied!" : "Copy Token"}
+          <h2 className="card-title">MCP Endpoint</h2>
+        </div>
+        <div className="token-box">
+          <code className="token-code">{MCP_ENDPOINT}</code>
+          <button
+            onClick={() => navigator.clipboard.writeText(MCP_ENDPOINT).then(() => { setCopiedToken(true); setTimeout(() => setCopiedToken(false), 2000); })}
+            className={`copy-btn ${copiedToken ? "copied" : ""}`}
+            title="Copy endpoint URL"
+          >
+            {copiedToken ? (
+              <svg className="svg-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+            ) : (
+              <svg className="svg-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
+            )}
           </button>
         </div>
-
-        <div className="token-box">
-          <code className="token-code">{token}</code>
-        </div>
         <p className="card-desc">
-          Set this token in your MCP configuration to bypass connection confirmation prompts and automatically attach.
+          Streamable HTTP MCP endpoint. Add this to your AI Coding Assistant (Cursor, Claude Desktop, Antigravity) to enable browser automation.
         </p>
       </div>
 

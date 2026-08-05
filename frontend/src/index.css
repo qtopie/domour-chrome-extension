@@ -1006,5 +1006,233 @@ body {
   line-height: 1.45;
 }
 
+/* ================================================
+   NMH Install Guide Banner
+   ================================================ */
+.nmh-banner {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(234, 88, 12, 0.05) 100%);
+  border-left: 3px solid var(--warning);
+  border-bottom: 1px solid rgba(245, 158, 11, 0.2);
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  z-index: 9;
+  animation: nmh-slide-in 0.25s ease-out;
+}
 
+@keyframes nmh-slide-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 
+.nmh-banner-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.nmh-banner-icon {
+  font-size: 0.95rem;
+  color: var(--warning);
+  flex-shrink: 0;
+}
+
+.nmh-banner-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.nmh-banner-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--warning);
+  letter-spacing: 0.02em;
+}
+
+.nmh-banner-subtitle {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+/* CTA Buttons Row */
+.nmh-banner-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.nmh-path-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.18s ease;
+  flex: 1;
+  justify-content: center;
+}
+
+.nmh-path-btn--primary {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.35);
+  color: var(--warning);
+}
+.nmh-path-btn--primary:hover,
+.nmh-path-btn--primary.active {
+  background: rgba(245, 158, 11, 0.22);
+  border-color: var(--warning);
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.2);
+}
+
+.nmh-path-btn--secondary {
+  background: rgba(99, 102, 241, 0.08);
+  border-color: rgba(99, 102, 241, 0.25);
+  color: var(--primary);
+}
+.nmh-path-btn--secondary:hover,
+.nmh-path-btn--secondary.active {
+  background: rgba(99, 102, 241, 0.16);
+  border-color: var(--primary);
+  box-shadow: 0 0 8px rgba(99, 102, 241, 0.2);
+}
+
+.nmh-path-btn-icon { font-size: 0.85rem; }
+.nmh-path-btn-arrow { font-size: 0.6rem; margin-left: auto; opacity: 0.7; }
+
+/* Expanded Panel */
+.nmh-expand-panel {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 0.7rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  animation: nmh-slide-in 0.2s ease-out;
+}
+
+.nmh-expand-desc {
+  font-size: 0.71rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+.nmh-expand-desc strong {
+  color: var(--text-main);
+  font-weight: 600;
+}
+
+/* Link Button */
+.nmh-link-btn {
+  background: none;
+  border: none;
+  color: var(--info);
+  font-size: 0.71rem;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  padding: 0;
+  text-align: left;
+  transition: color 0.15s ease;
+}
+.nmh-link-btn:hover { color: #7dd3fc; }
+
+/* Steps List */
+.nmh-steps {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.nmh-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.nmh-step-num {
+  width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 50%;
+  background: rgba(99, 102, 241, 0.2);
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  color: var(--primary);
+  font-size: 0.62rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 0.05rem;
+}
+
+.nmh-step-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.nmh-step-label {
+  font-size: 0.71rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* Code Block */
+.nmh-code-block {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 5px;
+  padding: 0.3rem 0.5rem;
+  width: fit-content;
+}
+
+.nmh-code {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: #a5f3fc;
+}
+
+.nmh-code-copy {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-dark);
+  font-size: 0.75rem;
+  padding: 0 0.15rem;
+  transition: color 0.15s ease;
+}
+.nmh-code-copy:hover { color: var(--text-muted); }
+.nmh-code-copy.copied { color: var(--success); }
+
+/* Footer */
+.nmh-banner-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.nmh-retry-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.nmh-retry-btn:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.05);
+}

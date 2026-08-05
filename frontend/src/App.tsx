@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import ProxyManager from "./components/ProxyManager";
 import PlaywrightManager from "./components/PlaywrightManager";
+import NmhInstallBanner from "./components/NmhInstallBanner";
 
 declare const chrome: any;
 
@@ -10,9 +11,12 @@ interface LogEntry {
   message: string;
 }
 
+type BridgeStatus = "CONNECTED" | "DISCONNECTED" | "NOT_INSTALLED";
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<"bridge" | "proxy" | "playwright">("bridge");
   const [token, setToken] = useState<string>("");
+  const [bridgeStatus, setBridgeStatus] = useState<BridgeStatus>("DISCONNECTED");
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [copied, setCopied] = useState<boolean>(false);
@@ -49,9 +53,15 @@ export default function App() {
       });
 
       // 3. Check Native Bridge Connection State
-      chrome.runtime.sendMessage({ type: "CHECK_CONNECTION" }, (response: { connected?: boolean }) => {
+      chrome.runtime.sendMessage({ type: "CHECK_CONNECTION" }, (response: { connected?: boolean; reason?: string }) => {
         if (response && response.connected !== undefined) {
-          setIsConnected(response.connected);
+          const connected = response.connected;
+          setIsConnected(connected);
+          if (connected) {
+            setBridgeStatus("CONNECTED");
+          } else {
+            setBridgeStatus((response.reason as BridgeStatus) ?? "DISCONNECTED");
+          }
         }
       });
 
@@ -63,7 +73,13 @@ export default function App() {
             return nextLogs.length > 200 ? nextLogs.slice(1) : nextLogs;
           });
         } else if (message.type === "CONNECTION_STATUS") {
-          setIsConnected(message.connected);
+          const connected: boolean = message.connected;
+          setIsConnected(connected);
+          if (connected) {
+            setBridgeStatus("CONNECTED");
+          } else {
+            setBridgeStatus((message.reason as BridgeStatus) ?? "DISCONNECTED");
+          }
         }
       };
 
@@ -194,6 +210,11 @@ export default function App() {
         </div>
       </header>
 
+      {/* NMH Install Guide Banner — only shown when host is not registered */}
+      {isExtension && bridgeStatus === "NOT_INSTALLED" && (
+        <NmhInstallBanner onRetryConnect={triggerReconnect} />
+      )}
+
       {/* Navigation Tab Bar */}
       <nav className="tab-nav">
         <button
@@ -219,9 +240,9 @@ export default function App() {
           onClick={() => setActiveTab("playwright")}
         >
           <svg className="tab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5l7 7-7 7" />
           </svg>
-          Playwright MCP
+          MCP Server
         </button>
       </nav>
 
@@ -298,7 +319,7 @@ export default function App() {
         ) : activeTab === "proxy" ? (
           <ProxyManager isExtension={isExtension} onLogMessage={appendSystemLog} />
         ) : (
-          <PlaywrightManager token={token} isExtension={isExtension} onLogMessage={appendSystemLog} />
+          <PlaywrightManager isExtension={isExtension} onLogMessage={appendSystemLog} />
         )}
       </main>
 

@@ -20,8 +20,10 @@ export function appendLog(level: string, message: string): void {
   });
 }
 
-export function notifyPanelStatus(connected: boolean): void {
-  chrome.runtime.sendMessage({ type: "CONNECTION_STATUS", connected }).catch(() => {
+export type BridgeDisconnectReason = "NOT_INSTALLED" | "DISCONNECTED";
+
+export function notifyPanelStatus(connected: boolean, reason?: BridgeDisconnectReason): void {
+  chrome.runtime.sendMessage({ type: "CONNECTION_STATUS", connected, reason }).catch(() => {
     // Ignore errors when panel is closed
   });
 }
