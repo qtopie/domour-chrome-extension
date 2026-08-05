@@ -319,7 +319,7 @@ export default function App() {
         ) : activeTab === "proxy" ? (
           <ProxyManager isExtension={isExtension} onLogMessage={appendSystemLog} />
         ) : (
-          <PlaywrightManager isExtension={isExtension} onLogMessage={appendSystemLog} />
+          <PlaywrightManager token={token} isExtension={isExtension} onLogMessage={appendSystemLog} />
         )}
       </main>
 

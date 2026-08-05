@@ -3,11 +3,12 @@ import { useState, useEffect } from "react";
 declare const chrome: any;
 
 interface PlaywrightManagerProps {
+  token: string;
   isExtension: boolean;
   onLogMessage?: (level: string, message: string) => void;
 }
 
-export default function PlaywrightManager({ isExtension, onLogMessage }: PlaywrightManagerProps) {
+export default function PlaywrightManager({ token, isExtension, onLogMessage }: PlaywrightManagerProps) {
   const [copiedToken, setCopiedToken] = useState<boolean>(false);
   const [copiedSnippet, setCopiedSnippet] = useState<boolean>(false);
   const [connectedTabs, setConnectedTabs] = useState<number[]>([]);
@@ -38,7 +39,10 @@ export default function PlaywrightManager({ isExtension, onLogMessage }: Playwri
   const mcpConfigSnippet = JSON.stringify({
     mcpServers: {
       "domour-chrome-mcp": {
-        url: MCP_ENDPOINT
+        url: MCP_ENDPOINT,
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
       }
     }
   }, null, 2);
