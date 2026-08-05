@@ -27,6 +27,13 @@ export const DEFAULT_PROFILES: ProxyProfile[] = [
     updatedAt: Date.now()
   },
   {
+    id: "system",
+    name: "System Default Proxy",
+    mode: "system",
+    color: "#6366f1",
+    updatedAt: Date.now()
+  },
+  {
     id: "vproxy_pac_default",
     name: "vproxy Auto PAC (Default)",
     mode: "pac_script",
@@ -49,6 +56,8 @@ export function applyProxyConfig(profile: ProxyProfile | null): Promise<void> {
 
     if (!profile || profile.mode === "direct" || profile.id === "direct") {
       config = { mode: "direct" };
+    } else if (profile.mode === "system" || profile.id === "system") {
+      config = { mode: "system" };
     } else if (profile.mode === "fixed_servers") {
       const scheme = (profile.scheme || "http") as chrome.proxy.Scheme;
       const host = profile.host || "127.0.0.1";

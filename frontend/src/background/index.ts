@@ -171,10 +171,21 @@ function handleVproxySync(data: ChromeMessage): void {
 
 // Global Message Handlers
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (!message || !message.type) {
+    return false;
+  }
+
   if (message.type === "CHECK_CONNECTION") {
     sendResponse({ connected: !!nativePort, reason: nativePort ? undefined : lastDisconnectReason });
-    return true;
+    return false;
   }
+
+  if (message.type === "RECONNECT") {
+    connectToNative();
+    sendResponse({ success: true, connected: !!nativePort, reason: nativePort ? undefined : lastDisconnectReason });
+    return false;
+  }
+
   if (message.type === "GET_PROXY_STATE") {
     chrome.storage.local.get(["proxy_profiles", "active_proxy_id"], (res) => {
       const profiles = (res.proxy_profiles as ProxyProfile[]) || DEFAULT_PROFILES;
@@ -184,6 +195,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     });
     return true;
   }
+
   if (message.type === "SET_ACTIVE_PROXY") {
     const targetId = message.profileId;
     chrome.storage.local.get(["proxy_profiles"], (res) => {
@@ -198,12 +210,97 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     });
     return true;
   }
+
+  if (message.type === "SAVE_PROXY_PROFILE") {
+    const newProfile: ProxyProfile = message.profile;
+    if (!newProfile || !newProfile.id) {
+      sendResponse({ success: false, error: "Invalid profile payload" });
+      return false;
+    }
+
+    chrome.storage.local.get(["proxy_profiles", "active_proxy_id"], (res) => {
+      let profiles: ProxyProfile[] = (res.proxy_profiles as ProxyProfile[]) || DEFAULT_PROFILES;
+      const activeId = (res.active_proxy_id as string) || "direct";
+
+      const idx = profiles.findIndex((p) => p.id === newProfile.id);
+      const updatedProfile = { ...newProfile, updatedAt: Date.now() };
+
+      if (idx >= 0) {
+        profiles[idx] = updatedProfile;
+      } else {
+        profiles.push(updatedProfile);
+      }
+
+      chrome.storage.local.set({ proxy_profiles: profiles }, () => {
+        if (newProfile.id === activeId) {
+          applyProxyConfig(updatedProfile).catch(() => {});
+        }
+        chrome.runtime.sendMessage({ type: "PROXY_PROFILES_UPDATED", profiles, activeProfileId: activeId }).catch(() => {});
+        sendResponse({ success: true, profiles });
+      });
+    });
+    return true;
+  }
+
+  if (message.type === "DELETE_PROXY_PROFILE") {
+    const targetId = message.profileId;
+    if (targetId === "direct" || targetId === "system") {
+      sendResponse({ success: false, error: "Built-in system default profiles cannot be deleted." });
+      return false;
+    }
+
+    chrome.storage.local.get(["proxy_profiles", "active_proxy_id"], (res) => {
+      let profiles: ProxyProfile[] = (res.proxy_profiles as ProxyProfile[]) || DEFAULT_PROFILES;
+      let activeId = (res.active_proxy_id as string) || "direct";
+
+      profiles = profiles.filter((p) => p.id !== targetId);
+
+      if (activeId === targetId) {
+        activeId = "direct";
+        const directProfile = profiles.find((p) => p.id === "direct") || DEFAULT_PROFILES[0];
+        applyProxyConfig(directProfile).catch(() => {});
+      }
+
+      chrome.storage.local.set({ proxy_profiles: profiles, active_proxy_id: activeId }, () => {
+        chrome.runtime.sendMessage({ type: "PROXY_PROFILES_UPDATED", profiles, activeProfileId: activeId }).catch(() => {});
+        sendResponse({ success: true, profiles, activeProfileId: activeId });
+      });
+    });
+    return true;
+  }
+
+  if (message.type === "TRIGGER_VPROXY_SYNC") {
+    if (nativePort) {
+      try {
+        nativePort.postMessage({ type: "SYNC_VPROXY" });
+      } catch (e: any) {
+        appendLog("error", `Failed to dispatch SYNC_VPROXY to native host: ${e.message}`);
+      }
+    }
+    sendResponse({
+      success: true,
+      status: nativePort ? "vproxy sync requested via native bridge." : "Native bridge not connected."
+    });
+    return false;
+  }
+
   if (message.type === "TRIGGER_CONNECT") {
     connectToNative();
     sendResponse({ success: true, connected: !!nativePort });
-    return true;
+    return false;
   }
-  return true;
+
+  if (message.type === "getConnectionStatus") {
+    sendResponse({ connectedTabIds: [], clientName: undefined });
+    return false;
+  }
+
+  if (message.type === "disconnect") {
+    sendResponse({ success: true });
+    return false;
+  }
+
+  return false;
 });
 
 // Initialization
