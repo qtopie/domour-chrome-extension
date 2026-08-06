@@ -288,7 +288,8 @@ func startEmbeddedMCPServer(port int) {
 		}
 
 		proxyString := defaultUpstream
-		var matchedDomains []string
+		var directDomains, proxyDomains []string
+		finalAction := ""
 
 		if cfgData, err := os.ReadFile(vproxyCfgPath); err == nil {
 			var cfg struct {
@@ -315,27 +316,53 @@ func startEmbeddedMCPServer(port int) {
 				}
 
 				// 2. Dynamic Domain Rules
+				// vproxy rules have the form "<domain>,DIRECT|PROXY", "FINAL,DIRECT|PROXY"
+				// (catch-all for unmatched traffic), "PROCESS,<name>,PROXY", or "DEFAULT,...".
+				// Only domain/IP rules can be translated into PAC conditions.
 				for _, rule := range cfg.Rules {
 					parts := strings.Split(rule, ",")
-					if len(parts) == 2 && parts[1] == "PROXY" && parts[0] != "DEFAULT" && !strings.HasPrefix(parts[0], "PROCESS") {
-						matchedDomains = append(matchedDomains, parts[0])
+					if len(parts) != 2 || strings.HasPrefix(parts[0], "PROCESS") || parts[0] == "DEFAULT" {
+						continue
 					}
+					action := parts[1]
+					if strings.EqualFold(parts[0], "FINAL") {
+						if action == "DIRECT" || action == "PROXY" {
+							finalAction = action
+						}
+						continue
+					}
+					switch action {
+					case "DIRECT":
+						directDomains = append(directDomains, parts[0])
+					case "PROXY":
+						proxyDomains = append(proxyDomains, parts[0])
+					}
+				}
+
+				// If no usable rules were configured, fall back to the default domain list.
+				if len(directDomains) == 0 && len(proxyDomains) == 0 && finalAction == "" {
+					proxyDomains = defaultDomains
 				}
 			}
 		}
 
-		if len(matchedDomains) == 0 {
-			matchedDomains = defaultDomains
-		}
-
 		// Escape domain strings for regex
-		var regexConditions []string
-		for _, d := range matchedDomains {
+		var directRegexes, proxyRegexes []string
+		for _, d := range directDomains {
 			escapedDomain := strings.ReplaceAll(d, ".", "\\.")
-			regexConditions = append(regexConditions, fmt.Sprintf("        if (/(?:^|\\.)%s$/.test(host)) return \"+proxy\";", escapedDomain))
+			directRegexes = append(directRegexes, fmt.Sprintf("        if (/(?:^|\\.)%s$/.test(host)) return \"DIRECT\";", escapedDomain))
+		}
+		for _, d := range proxyDomains {
+			escapedDomain := strings.ReplaceAll(d, ".", "\\.")
+			proxyRegexes = append(proxyRegexes, fmt.Sprintf("        if (/(?:^|\\.)%s$/.test(host)) return \"+proxy\";", escapedDomain))
 		}
 
-		regexBlock := strings.Join(regexConditions, "\n")
+		directBlock := strings.Join(directRegexes, "\n")
+		proxyBlock := strings.Join(proxyRegexes, "\n")
+		finalLine := ""
+		if finalAction == "PROXY" {
+			finalLine = `        return "+proxy";`
+		}
 
 		pacScript := fmt.Sprintf(`function isPlainHostName(host) {
     return host.indexOf('.') === -1;
@@ -359,13 +386,15 @@ var FindProxyForURL = function(init, profiles) {
         if (/^(?:10|127|192\.168|172\.(?:1[6-9]|2[0-9]|3[01]))\./.test(host)) return "DIRECT";
 
 %s
+%s
+%s
         return "DIRECT";
     },
     "+proxy": function(url, host, scheme) {
         "use strict";
         return "%s";
     }
-});`, regexBlock, proxyString)
+});`, directBlock, proxyBlock, finalLine, proxyString)
 
 		w.Write([]byte(pacScript))
 	})

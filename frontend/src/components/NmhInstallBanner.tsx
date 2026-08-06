@@ -9,8 +9,8 @@ type InstallPath = null | "cosmos" | "manual";
 export default function NmhInstallBanner({ onRetryConnect }: NmhInstallBannerProps) {
   const [activePath, setActivePath] = useState<InstallPath>(null);
 
-  const COSMOS_RELEASES_URL = "https://github.com/qtopierw/cosmos-assistant/releases/latest";
-  const BINARY_RELEASES_URL = "https://github.com/qtopierw/domour-chrome-extension/releases/latest";
+  const COSMOS_RELEASES_URL = "https://github.com/qtopie/cosmos-assistant/releases/latest";
+  const BINARY_RELEASES_URL = "https://github.com/qtopie/domour-chrome-extension/releases/latest";
 
   const openLink = (url: string) => {
     if (typeof chrome !== "undefined" && chrome.tabs) {
