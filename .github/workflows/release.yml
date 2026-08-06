@@ -52,6 +52,14 @@ jobs:
           GOOS=windows GOARCH=amd64 go build -o release-binaries/domour-chrome-bridge-windows-amd64.exe main.go
           GOOS=windows GOARCH=amd64 go build -o release-binaries/domour-chrome-cli-windows-amd64.exe cmd/main.go
 
+      - name: Generate SHA-256 Checksums
+        run: |
+          # Publish a companion .sha256 file per asset for integrity verification
+          for f in release-binaries/*; do
+            sha256sum "$f" > "${f}.sha256"
+          done
+          ls -la release-binaries/
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
