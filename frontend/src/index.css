@@ -1685,9 +1685,9 @@ body {
 
 /* ===== Options page layout ===== */
 .options-container {
-  max-width: 760px;
+  max-width: none;
   margin: 0 auto;
-  padding: 1rem;
+  padding: 1.25rem 1.5rem;
   display: flex;
   flex-direction: column;
   min-height: 100vh;

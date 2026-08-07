@@ -182,11 +182,12 @@ export default function OptionsPage() {
               <div className="bridge-install-path">
                 <div className="bridge-install-path-head">
                   <span className="install-path-badge auto">自动安装</span>
-                  <span className="install-path-name">Cosmos Assistant 桌面应用</span>
+                  <span className="install-path-name">扩展 + Cosmos Assistant 桌面应用</span>
                 </div>
                 <p className="card-desc">
-                  下载桌面应用并在「Setup 向导」中完成 Browser Bridge 配置，即可自动注册 Native
-                  Messaging Host。
+                  本扩展已发布至 Chrome Web Store（扩展 ID{" "}
+                  <code className="inline-code">ndbhggifgbebojmidnoenkfpiiknkggc</code>）。下载桌面应用并在
+                  「Setup 向导」中完成 Browser Bridge 配置，即可自动注册 Native Messaging Host。
                 </p>
                 <a
                   href="https://qtopie.space/"
@@ -201,11 +202,11 @@ export default function OptionsPage() {
               <div className="bridge-install-path">
                 <div className="bridge-install-path-head">
                   <span className="install-path-badge manual">手动安装</span>
-                  <span className="install-path-name">下载 binary + 运行注册脚本</span>
+                  <span className="install-path-name">GitHub Releases 下载 binary + 注册脚本</span>
                 </div>
                 <p className="card-desc">
-                  下载对应平台的 bridge binary，然后在终端运行注册脚本完成 Native Messaging Host
-                  注册。
+                  从 GitHub Releases 下载对应平台的 bridge binary，然后在终端运行注册脚本完成 Native
+                  Messaging Host 注册。
                 </p>
                 <button
                   onClick={() => setManualOpen(!manualOpen)}
@@ -217,19 +218,24 @@ export default function OptionsPage() {
                 {manualOpen && (
                   <ol className="manual-steps">
                     <li>
-                      从 <a href="https://qtopie.space/" target="_blank" rel="noreferrer">qtopie.space</a>{" "}
-                      下载对应平台的 bridge binary（<code className="inline-code">bin/domour-chrome-bridge</code>
+                      从{" "}
+                      <a
+                        href="https://github.com/qtopie/domour-chrome-extension/releases"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        GitHub Releases
+                      </a>{" "}
+                      下载对应平台的 bridge binary（<code className="inline-code">domour-chrome-bridge</code>
                       ）并解压到本地目录。
                     </li>
                     <li>
-                      在终端运行注册脚本（<code className="inline-code">EXTENSION_ID</code> 可在{" "}
-                      <code className="inline-code">chrome://extensions</code> 查看）：
+                      在终端运行注册脚本。扩展已发布至 Chrome Web Store，注册命令默认使用生产扩展 ID
+                      （无需传参）：
                       <pre className="install-code">
-                        <code>./register_host.sh &lt;EXTENSION_ID&gt;</code>
+                        <code>./register_host.sh</code>
                         <button
-                          onClick={() =>
-                            navigator.clipboard.writeText("./register_host.sh <EXTENSION_ID>")
-                          }
+                          onClick={() => navigator.clipboard.writeText("./register_host.sh")}
                           className="copy-btn-text"
                         >
                           Copy
