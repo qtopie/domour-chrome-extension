@@ -31,6 +31,7 @@ import {
 } from './trafficAnalysis';
 import { validateTrafficConfig } from '../types/trafficAnalysis';
 import type { TrafficAnalysisConfig } from '../types/trafficAnalysis';
+import { runRequestTest } from '../types/requestTest';
 
 function getSiteRules(callback: (rules: SiteRules) => void): void {
   chrome.storage.local.get(["site_rules"], (res) => {
@@ -637,6 +638,25 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === "CLEAR_VPROXY_TRACES") {
     sendResponse(clearVProxyTraces());
     return false;
+  }
+
+  if (message.type === "TEST_REQUEST") {
+    runRequestTest(message.composer)
+      .then((result) => sendResponse(result))
+      .catch((e: any) =>
+        sendResponse({
+          ok: false,
+          status: 0,
+          statusText: "",
+          finalUrl: "",
+          latencyMs: 0,
+          headers: [],
+          body: "",
+          truncated: false,
+          error: e instanceof Error ? e.message : String(e)
+        })
+      );
+    return true;
   }
 
   if (message.type === "CHAT_SEND") {
