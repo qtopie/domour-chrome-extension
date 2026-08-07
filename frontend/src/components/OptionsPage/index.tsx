@@ -19,6 +19,7 @@ export default function OptionsPage() {
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [token, setToken] = useState<string>("");
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [copiedToken, setCopiedToken] = useState<boolean>(false);
 
   useEffect(() => {
     const hasChrome = typeof chrome !== "undefined" && chrome.storage && chrome.storage.local;
@@ -50,6 +51,34 @@ export default function OptionsPage() {
   const appendSystemLog = (level: string, message: string) => {
     const entry: LogEntry = { timestamp: new Date().toLocaleTimeString(), level, message };
     setLogs((prev) => [...prev.slice(-199), entry]);
+  };
+
+  // Generates cryptographically secure random API token prefixed with tk_
+  const generateToken = (): string => {
+    const array = new Uint8Array(15);
+    crypto.getRandomValues(array);
+    const hex = Array.from(array, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    return `tk_${hex}`;
+  };
+
+  const copyToken = () => {
+    navigator.clipboard.writeText(token).then(() => {
+      setCopiedToken(true);
+      setTimeout(() => setCopiedToken(false), 2000);
+    });
+  };
+
+  const regenerateToken = () => {
+    if (window.confirm("确定要重新生成 API Token 吗？使用旧 Token 的外部脚本将立即失效。")) {
+      const newToken = generateToken();
+      setToken(newToken);
+      if (isExtension && typeof chrome !== "undefined" && chrome.storage) {
+        chrome.storage.local.set({ api_token: newToken }, () => {
+          appendSystemLog("system", `New token generated: ${newToken.substring(0, 8)}...`);
+          chrome.runtime.sendMessage({ type: "RECONNECT" }).catch(() => {});
+        });
+      }
+    }
   };
 
   return (
@@ -116,10 +145,30 @@ export default function OptionsPage() {
         )}
         {activeTab === "bridge" && (
           <section className="panel-card">
-            <h2 className="card-title">桥接配置</h2>
-            <p className="card-desc">当前 API Token：</p>
+            <div className="card-header">
+              <h2 className="card-title">桥接配置</h2>
+              <button onClick={regenerateToken} className="regenerate-btn">
+                Regenerate
+              </button>
+            </div>
+            <p className="card-desc">API Token：外部任务请求需携带此 token 认证。</p>
             <div className="token-box">
               <code className="token-code">{token}</code>
+              <button
+                onClick={copyToken}
+                className={`copy-btn ${copiedToken ? "copied" : ""}`}
+                title="Copy token"
+              >
+                {copiedToken ? (
+                  <svg className="svg-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  <svg className="svg-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                  </svg>
+                )}
+              </button>
             </div>
             <p className="card-desc">
               桥接守护进程运行于 localhost:26888，为扩展提供 MCP 服务与原生消息通道。

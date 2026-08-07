@@ -97,29 +97,6 @@ export default function App() {
     }
   }, []);
 
-  // Generates cryptographically secure random API token prefixed with tk_
-  const generateToken = (): string => {
-    const array = new Uint8Array(15);
-    crypto.getRandomValues(array);
-    const hex = Array.from(array, (byte) => byte.toString(16).padStart(2, "0")).join("");
-    return `tk_${hex}`;
-  };
-
-  const regenerateToken = () => {
-    if (window.confirm("Are you sure you want to regenerate the API Token? Existing external scripts using the old token will fail authentication.")) {
-      const newToken = generateToken();
-      if (isExtension) {
-        chrome.storage.local.set({ api_token: newToken }, () => {
-          setToken(newToken);
-          appendSystemLog("system", `New token generated: ${newToken.substring(0, 8)}...`);
-          chrome.runtime.sendMessage({ type: "RECONNECT" }).catch(() => {});
-        });
-      } else {
-        setToken(newToken);
-      }
-    }
-  };
-
   const appendSystemLog = (level: string, message: string) => {
     const entry: LogEntry = {
       timestamp: new Date().toLocaleTimeString(),
@@ -181,6 +158,16 @@ export default function App() {
             {isConnected ? "ACTIVE" : "OFFLINE"}
           </span>
         </div>
+        <button
+          onClick={() => chrome.runtime?.openOptionsPage?.()}
+          className="options-shortcut-btn"
+          title="打开设置"
+        >
+          <svg className="svg-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </button>
       </header>
 
       {/* NMH Install Guide Banner — only shown when host is not registered */}
@@ -223,11 +210,9 @@ export default function App() {
       <main className="main-content">
         {activeTab === "overview" && (
           <OverviewPanel
-            token={token}
             isConnected={isConnected}
             bridgeStatus={bridgeStatus}
             isExtension={isExtension}
-            onRegenerateToken={regenerateToken}
             onReconnect={triggerReconnect}
           />
         )}

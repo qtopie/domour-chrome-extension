@@ -178,6 +178,26 @@ body {
   box-shadow: 0 0 8px var(--success);
 }
 
+/* Options Page Quick Entry */
+.options-shortcut-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-badge);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.4rem;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: all 0.2s ease;
+}
+
+.options-shortcut-btn:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+  box-shadow: 0 0 8px var(--primary-glow);
+}
+
 .status-dot.offline {
   background-color: var(--error);
   box-shadow: 0 0 8px var(--error);
@@ -1084,6 +1104,19 @@ body {
   padding: 0.2rem 0.4rem;
   border-radius: 4px;
   transition: all 0.2s ease;
+}
+
+.snippet-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.55rem;
+}
+
+.snippet-header-row .card-desc {
+  margin: 0;
+  flex: 1;
 }
 
 .copy-btn-text:hover {

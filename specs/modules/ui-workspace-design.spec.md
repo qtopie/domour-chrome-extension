@@ -57,13 +57,13 @@
 
 ## 3. Side Panel（工作区，3-Tab）
 
-`App.tsx` 现有 3 tab 重构为 3 tab（Overview / Chat / Logs），**Tasks & 通知 合并入 Overview**。**代理管理不在 Side Panel** —— Proxy Profile 的 CRUD 与切换已由 Options Page 承载（见 §4），Side Panel 聚焦工作流。
+`App.tsx` 现有 3 tab 重构为 3 tab（Overview / Chat / Logs），**Tasks & 通知 合并入 Overview**。**代理管理不在 Side Panel** —— Proxy Profile 的 CRUD 与切换已由 Options Page 承载（见 §4），Side Panel 聚焦工作流。Header 含 **Options 快捷入口**（齿轮按钮 → `chrome.runtime.openOptionsPage()`）。
 
 | Tab | 组件 | 内容 |
 |---|---|---|
-| Overview（概览） | `OverviewPanel` | 状态卡片（Bridge/Native/Token）、**通知中心**（任务进度、股票行情、事件提醒，即 `TasksPanel`） |
-| Chat | `ChatPanel` + `PlaywrightManager` | 用户 ↔ AI Agent 自然语言对话，流式回复，任务指令下发；`Domour Chrome MCP` 卡片含默认折叠的 MCP Endpoint |
-| Logs | `Bridge & Logs`（现有） | API Token + 实时日志 |
+| Overview（概览） | `OverviewPanel` | 状态卡片（Bridge/Native）、**通知中心**（任务进度、股票行情、事件提醒，即 `TasksPanel`） |
+| Chat | `ChatPanel` + `PlaywrightManager` | 用户 ↔ AI Agent 自然语言对话，流式回复，任务指令下发；`Domour Chrome MCP` 卡片含默认折叠的 **MCP Endpoint** 与 **MCP Server Config Snippet** 两节 |
+| Logs | `Bridge & Logs`（现有） | 实时日志 |
 
 > **注：** 现有 `ProxyManager` 组件从 Side Panel 迁入 Options Page（§4.1），代码复用不删除。
 
@@ -126,9 +126,9 @@ Side Panel Chat ──sendMessage──▶ background ──native pipe──▶
 
 | Tab | 功能 | 对应 storage key |
 |---|---|---|
-| **General** | API Token（从 Side Panel 迁出）、Cookie 提取开关、主题 | `api_token`, `allow_cookie_extraction`, `theme` |
+| **General** | Cookie 提取开关、主题 | `allow_cookie_extraction`, `theme` |
 | **Proxy** | 代理 Profile 管理（原 Side Panel `ProxyManager` 组件迁入）：Profile CRUD、切换 active profile、bypass 规则编辑 | `proxy_profiles`, `active_proxy` |
-| **Bridge Setup** (P1) | 安装引导三步（下载→运行→验证），连接状态 + Troubleshooting | —（只读 + 触发 RECONNECT） |
+| **Bridge Setup** (P1) | 安装引导三步（下载→运行→验证），连接状态 + Troubleshooting，**API Token 管理**（查看/复制/重新生成，从 Side Panel 迁出） | `api_token`（读/写 + 触发 RECONNECT） |
 | **Notifications** | 股票自选源、任务触发条件、提醒方式（badge/声音/系统通知） | `notify_rules` |
 | **Site Rules** | 全局默认 + 按域名白名单/黑名单管理（注入/代理/Cookie 三项独立） | `site_rules` |
 | **Advanced** | MCP 端口、日志级别、数据管理（清日志/清 chat 历史）、重置 | `mcp_port`, `log_level` |

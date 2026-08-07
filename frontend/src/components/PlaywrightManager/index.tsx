@@ -15,6 +15,7 @@ export default function PlaywrightManager({ token, isExtension, onLogMessage }: 
   const [clientName, setClientName] = useState<string | undefined>();
   const [isRelayActive, setIsRelayActive] = useState<boolean>(false);
   const [endpointOpen, setEndpointOpen] = useState<boolean>(false);
+  const [snippetOpen, setSnippetOpen] = useState<boolean>(false);
 
   useEffect(() => {
     if (isExtension && typeof chrome !== "undefined" && chrome.runtime) {
@@ -163,6 +164,38 @@ export default function PlaywrightManager({ token, isExtension, onLogMessage }: 
             </p>
           </div>
         )}
+
+        {/* MCP Server Config Snippet — collapsed by default, merged into Domour Chrome MCP card */}
+        <button
+          onClick={() => setSnippetOpen(!snippetOpen)}
+          className="endpoint-toggle"
+          aria-expanded={snippetOpen}
+        >
+          <svg
+            className={`svg-icon endpoint-toggle-arrow ${snippetOpen ? "open" : ""}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+          MCP Server Config Snippet
+        </button>
+        {snippetOpen && (
+          <div className="endpoint-panel">
+            <div className="snippet-header-row">
+              <p className="card-desc">
+                将以下 JSON 配置到你的 AI 编程助手 MCP 客户端即可连接。
+              </p>
+              <button onClick={copyConfigSnippet} className="copy-btn-text">
+                {copiedSnippet ? "Copied!" : "Copy JSON"}
+              </button>
+            </div>
+            <pre className="snippet-code-box">
+              <code>{mcpConfigSnippet}</code>
+            </pre>
+          </div>
+        )}
       </div>
 
       {/* Privacy & Security Controls Card */}
@@ -196,19 +229,6 @@ export default function PlaywrightManager({ token, isExtension, onLogMessage }: 
             </span>
           </label>
         </div>
-      </div>
-
-      {/* MCP Server Config Snippet */}
-      <div className="panel-card">
-        <div className="card-header">
-          <h2 className="card-title">MCP Server Config Snippet</h2>
-          <button onClick={copyConfigSnippet} className="copy-btn-text">
-            {copiedSnippet ? "Copied!" : "Copy JSON"}
-          </button>
-        </div>
-        <pre className="snippet-code-box">
-          <code>{mcpConfigSnippet}</code>
-        </pre>
       </div>
     </div>
   );
