@@ -3,6 +3,7 @@ import { sendMessage } from "../../utils/sendMessage";
 import { resolveSiteRule, hostFromUrl } from "../../types/siteRules";
 import { matchPerHost } from "../../types/requestHeaders";
 import type { HeaderKV } from "../../types/requestHeaders";
+import { useI18n } from "../../i18n/I18nProvider";
 
 declare const chrome: any;
 
@@ -19,6 +20,7 @@ interface HdrEdit {
 }
 
 export default function PopupApp() {
+  const { t } = useI18n();
   const [profiles, setProfiles] = useState<ProxyProfile[]>([]);
   const [activeProfileId, setActiveProfileId] = useState<string>("direct");
   const [isConnected, setIsConnected] = useState<boolean>(false);
@@ -160,7 +162,7 @@ export default function PopupApp() {
       </header>
 
       <section className="popup-section">
-        <h3 className="popup-section-title">代理 Profile</h3>
+        <h3 className="popup-section-title">{t("popup.proxyProfile")}</h3>
         {profiles.map((p) => (
           <label key={p.id} className={`popup-profile ${activeProfileId === p.id ? "selected" : ""}`}>
             <input
@@ -176,33 +178,33 @@ export default function PopupApp() {
 
       <section className="popup-section">
         <h3 className="popup-section-title">
-          当前站点 <span className="popup-host">{currentHost || "未知"}</span>
+          {t("popup.currentSite")} <span className="popup-host">{currentHost || t("popup.unknown")}</span>
         </h3>
         {currentHost ? (
           <div className="popup-toggles">
             <label>
               <input type="checkbox" checked={!!rule?.inject} onChange={() => toggleSiteFlag("inject")} />
-              允许注入
+              {t("popup.allowInject")}
             </label>
             <label>
               <input type="checkbox" checked={!!rule?.bypassProxy} onChange={() => toggleSiteFlag("bypassProxy")} />
-              绕过代理
+              {t("popup.bypassProxy")}
             </label>
             <label>
               <input type="checkbox" checked={!!rule?.cookies} onChange={() => toggleSiteFlag("cookies")} />
-              允许 Cookie
+              {t("popup.allowCookie")}
             </label>
           </div>
         ) : (
-          <p className="popup-muted">无活动标签页</p>
+          <p className="popup-muted">{t("popup.noActiveTab")}</p>
         )}
       </section>
 
       <section className="popup-section">
-        <h3 className="popup-section-title">当前站点请求头</h3>
+        <h3 className="popup-section-title">{t("popup.siteHeaders")}</h3>
         {currentHost ? (
           <div className="hdr-kv-rows popup-hdr-rows">
-            {hdrKvs.length === 0 && <p className="popup-muted">未设置，添加 Key/Value 后保存</p>}
+            {hdrKvs.length === 0 && <p className="popup-muted">{t("popup.noHeaders")}</p>}
             {hdrKvs.map((kv, i) => (
               <div key={i} className="hdr-kv-row">
                 <input
@@ -218,25 +220,25 @@ export default function PopupApp() {
                   value={kv.value}
                   onChange={(e) => updateKv(i, "value", e.target.value)}
                 />
-                <button className="popup-kv-del" onClick={() => removeKvRow(i)} title="删除此行">
+                <button className="popup-kv-del" onClick={() => removeKvRow(i)} title={t("headers.deleteRowTitle")}>
                   ×
                 </button>
               </div>
             ))}
             <div className="hdr-actions">
               <button className="add-kv-btn" onClick={addKvRow}>
-                + 添加
+                {t("popup.add")}
               </button>
               <button
                 className={`popup-options-btn ${hdrDirty ? "popup-btn-primary" : ""}`}
                 onClick={saveHostHeaders}
               >
-                {hdrDirty ? "保存" : "已同步"}
+                {hdrDirty ? t("popup.save") : t("popup.sync")}
               </button>
             </div>
           </div>
         ) : (
-          <p className="popup-muted">无活动标签页</p>
+          <p className="popup-muted">{t("popup.noActiveTab")}</p>
         )}
       </section>
 
@@ -245,7 +247,7 @@ export default function PopupApp() {
           onClick={() => chrome.runtime?.openOptionsPage?.()}
           className="popup-options-btn"
         >
-          打开设置
+          {t("common.openSettings")}
         </button>
       </footer>
     </div>

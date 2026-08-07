@@ -29,7 +29,7 @@ console.log("TestRT_OptionsTabs (SPEC-RT-008)");
 
 // --- Tab list constant ---
 const keys = OPTIONS_TABS.map((t) => t.key);
-const labels = OPTIONS_TABS.map((t) => t.label);
+const labelKeys = OPTIONS_TABS.map((t) => t.labelKey);
 
 check("exactly 6 tabs", keys.length === 6, JSON.stringify(keys));
 check(
@@ -37,13 +37,12 @@ check(
   JSON.stringify(keys) === JSON.stringify(["general", "proxy", "siterules", "requestheaders", "traffic", "advanced"])
 );
 check(
-  "labels: 通用/代理/权限/请求/流量分析/高级",
-  JSON.stringify(labels) === JSON.stringify(["通用", "代理", "权限", "请求", "流量分析", "高级"])
+  "labelKeys are i18n keys: tabs.general/.../tabs.advanced",
+  JSON.stringify(labelKeys) === JSON.stringify(["tabs.general", "tabs.proxy", "tabs.siterules", "tabs.requestheaders", "tabs.traffic", "tabs.advanced"])
 );
 check("no bridge tab", !keys.includes("bridge"));
 check("no notifications tab", !keys.includes("notifications"));
-check("no standalone 站点规则 label", !labels.includes("站点规则"));
-check("no standalone 请求头 label", !labels.includes("请求头"));
+check("no raw Chinese labels in tabs.ts", !read("frontend/src/components/OptionsPage/tabs.ts").match(/[\u4e00-\u9fff]/));
 
 // --- OptionsPage renders 通用 with bridge + notifications ---
 const optionsSrc = read("frontend/src/components/OptionsPage/index.tsx");
@@ -80,15 +79,15 @@ check(
   /activeTab === "siterules" && <SiteRulesManager/.test(optionsSrc)
 );
 
-// --- RequestsManager has 请求头 + 请求测试 sub-tabs ---
+// --- RequestsManager has 请求头 + 请求测试 sub-tabs (i18n keys) ---
 const requestsSrc = read("frontend/src/components/RequestsManager/index.tsx");
 check(
-  "RequestsManager renders 请求头 sub-tab",
-  requestsSrc.includes("请求头")
+  "RequestsManager uses i18n key for 请求头 sub-tab",
+  requestsSrc.includes('t("requests.subtabHeaders")')
 );
 check(
-  "RequestsManager renders 请求测试 sub-tab",
-  requestsSrc.includes("请求测试")
+  "RequestsManager uses i18n key for 请求测试 sub-tab",
+  requestsSrc.includes('t("requests.subtabTest")')
 );
 check(
   "RequestsManager embeds RequestHeadersManager",

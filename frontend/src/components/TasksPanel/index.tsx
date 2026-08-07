@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { sendMessage } from "../../utils/sendMessage";
+import { useI18n } from "../../i18n/I18nProvider";
 
 declare const chrome: any;
 
@@ -19,6 +20,7 @@ interface TasksPanelProps {
 }
 
 export default function TasksPanel({ isExtension }: TasksPanelProps) {
+  const { t } = useI18n();
   const [events, setEvents] = useState<EventItem[]>([]);
   const [notifyEnabled, setNotifyEnabled] = useState(true);
 
@@ -70,10 +72,10 @@ export default function TasksPanel({ isExtension }: TasksPanelProps) {
     <div className="tasks-panel">
       <section className="panel-card">
         <div className="card-header">
-          <h2 className="card-title">通知中心</h2>
+          <h2 className="card-title">{t("tasks.title")}</h2>
           <label className="notify-toggle">
             <input type="checkbox" checked={notifyEnabled} onChange={toggleNotify} />
-            角标提醒
+            {t("tasks.badge")}
           </label>
         </div>
         <div className="console-logs">
@@ -82,7 +84,7 @@ export default function TasksPanel({ isExtension }: TasksPanelProps) {
               <svg className="no-logs-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
               </svg>
-              <span>暂无通知</span>
+              <span>{t("tasks.noNotifications")}</span>
             </div>
           ) : (
             events.map((ev) => (

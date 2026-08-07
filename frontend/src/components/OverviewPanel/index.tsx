@@ -1,4 +1,5 @@
 import TasksPanel from "../TasksPanel";
+import { useI18n } from "../../i18n/I18nProvider";
 
 interface OverviewPanelProps {
   isConnected: boolean;
@@ -13,28 +14,29 @@ export default function OverviewPanel({
   isExtension,
   onReconnect,
 }: OverviewPanelProps) {
+  const { t } = useI18n();
   return (
     <div className="overview-panel">
       <section className="panel-card">
         <div className="card-header">
-          <h2 className="card-title">工作区概览</h2>
+          <h2 className="card-title">{t("overview.title")}</h2>
           <span className={`status-dot ${isConnected ? "active" : "offline"}`} />
         </div>
         <p className="card-desc">
-          在 Chat 中与 AI Agent 对话、下发任务；Logs 调试桥接日志。通知与任务进度展示如下；代理与规则配置请前往扩展设置页。
+          {t("overview.desc")}
         </p>
       </section>
 
       <section className="panel-card">
         <div className="card-header">
-          <h2 className="card-title">桥接状态</h2>
+          <h2 className="card-title">{t("overview.bridgeStatus")}</h2>
           <button onClick={onReconnect} className="sync-btn">
-            重新连接
+            {t("overview.retry")}
           </button>
         </div>
         <p className="card-desc">
           <span className={`status-dot ${isConnected ? "active" : "offline"}`} />
-          {" "}{isConnected ? "ACTIVE" : bridgeStatus === "NOT_INSTALLED" ? "桥接未安装" : "OFFLINE"}
+          {" "}{isConnected ? t("common.active") : bridgeStatus === "NOT_INSTALLED" ? t("overview.bridgeNotInstalled") : t("common.offline")}
         </p>
       </section>
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { sendMessage } from "../../utils/sendMessage";
+import { useI18n } from "../../i18n/I18nProvider";
 
 declare const chrome: any;
 
@@ -20,6 +21,7 @@ interface ChatPanelProps {
 }
 
 export default function ChatPanel({ isExtension, onLogMessage }: ChatPanelProps) {
+  const { t } = useI18n();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -88,7 +90,7 @@ export default function ChatPanel({ isExtension, onLogMessage }: ChatPanelProps)
       sendMessage<any>({ type: "CHAT_SEND", jobId, message: text }, (res) => {
         if (res && res.success === false) {
           setSending(false);
-          setError(res.error || "发送失败");
+          setError(res.error || t("chat.sendFailed"));
           onLogMessage?.("error", `Chat send failed: ${res.error}`);
         }
       });
@@ -97,7 +99,7 @@ export default function ChatPanel({ isExtension, onLogMessage }: ChatPanelProps)
       setMessages((prev) => [
         ...prev,
         { jobId, role: "user", text, done: true },
-        { jobId, role: "assistant", text: `[mock] 已收到：${text}`, done: true },
+        { jobId, role: "assistant", text: t("chat.mockReceived", { text }), done: true },
       ]);
     }
   };
@@ -106,11 +108,11 @@ export default function ChatPanel({ isExtension, onLogMessage }: ChatPanelProps)
     <div className="chat-panel">
       <section className="panel-card chat-card">
         <div className="card-header">
-          <h2 className="card-title">AI Agent 对话</h2>
+          <h2 className="card-title">{t("chat.title")}</h2>
           <button
             onClick={() => setMessages([])}
             className="clear-btn"
-            title="清空本地视图"
+            title={t("chat.clearTitle")}
           >
             Clear
           </button>
@@ -121,13 +123,13 @@ export default function ChatPanel({ isExtension, onLogMessage }: ChatPanelProps)
               <svg className="no-logs-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
               </svg>
-              <span>向 Agent 描述你的任务…</span>
+              <span>{t("chat.describeTask")}</span>
             </div>
           ) : (
             messages.map((m, i) => (
               <div key={`${m.jobId}-${i}`} className={`chat-msg chat-msg-${m.role}`}>
                 <div className="chat-bubble">
-                  <span className="chat-role">{m.role === "user" ? "你" : "Agent"}</span>
+                  <span className="chat-role">{m.role === "user" ? t("chat.you") : t("chat.agent")}</span>
                   <span className="chat-text">{m.text}</span>
                   {!m.done && <span className="chat-cursor">▍</span>}
                 </div>
@@ -140,14 +142,14 @@ export default function ChatPanel({ isExtension, onLogMessage }: ChatPanelProps)
         <div className="chat-input-row">
           <input
             className="chat-input"
-            placeholder="输入任务或问题，Enter 发送"
+            placeholder={t("chat.placeholder")}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && send()}
             disabled={sending}
           />
           <button onClick={send} className="chat-send-btn" disabled={sending}>
-            发送
+            {t("chat.send")}
           </button>
         </div>
       </section>

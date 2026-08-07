@@ -7,6 +7,7 @@ import RequestsManager from "../RequestsManager";
 import BridgeConfig from "../BridgeConfig";
 import TrafficAnalysisManager from "../TrafficAnalysisManager";
 import { OPTIONS_TABS } from "./tabs";
+import { useI18n } from "../../i18n/I18nProvider";
 
 declare const chrome: any;
 
@@ -19,6 +20,7 @@ interface LogEntry {
 }
 
 export default function OptionsPage() {
+  const { t, setLang, override } = useI18n();
   const [activeTab, setActiveTab] = useState<TabKey>("general");
   const [isExtension, setIsExtension] = useState<boolean>(false);
   const [isConnected, setIsConnected] = useState<boolean>(false);
@@ -76,7 +78,7 @@ export default function OptionsPage() {
   };
 
   const regenerateToken = () => {
-    if (window.confirm("确定要重新生成 API Token 吗？使用旧 Token 的外部脚本将立即失效。")) {
+    if (window.confirm(t("options.regenerateToken.confirm"))) {
       const newToken = generateToken();
       setToken(newToken);
       if (isExtension && typeof chrome !== "undefined" && chrome.storage) {
@@ -110,18 +112,18 @@ export default function OptionsPage() {
         </div>
         <div className="status-badge">
           <span className={`status-dot ${isConnected ? "active" : "offline"}`} />
-          <span className="status-text">{isConnected ? "ACTIVE" : "OFFLINE"}</span>
+          <span className="status-text">{isConnected ? t("common.active") : t("common.offline")}</span>
         </div>
       </header>
 
       <nav className="tab-nav">
-        {OPTIONS_TABS.map(({ key, label }) => (
+        {OPTIONS_TABS.map(({ key, labelKey }) => (
           <button
             key={key}
             className={`tab-btn ${activeTab === key ? "active" : ""}`}
             onClick={() => setActiveTab(key as TabKey)}
           >
-            {label}
+            {t(labelKey)}
           </button>
         ))}
       </nav>
@@ -130,10 +132,20 @@ export default function OptionsPage() {
         {activeTab === "general" && (
           <>
             <section className="panel-card">
-              <h2 className="card-title">通用</h2>
-              <p className="card-desc">
-                代理配置已迁移至「代理」标签页；任务对话与日志请使用侧边面板工作区。
-              </p>
+              <h2 className="card-title">{t("options.general.title")}</h2>
+              <p className="card-desc">{t("options.general.desc")}</p>
+              <label className="lang-select-row">
+                <span className="lang-select-label">{t("options.language.title")}</span>
+                <select
+                  className="lang-select"
+                  value={override}
+                  onChange={(e) => setLang(e.target.value as "auto" | "zh-CN" | "en")}
+                >
+                  <option value="auto">{t("options.language.auto")}</option>
+                  <option value="zh-CN">{t("options.language.zh")}</option>
+                  <option value="en">{t("options.language.en")}</option>
+                </select>
+              </label>
             </section>
             <BridgeConfig
               token={token}
@@ -156,13 +168,13 @@ export default function OptionsPage() {
         {activeTab === "traffic" && <TrafficAnalysisManager isExtension={isExtension} />}
         {activeTab === "advanced" && (
           <section className="panel-card">
-            <h2 className="card-title">高级</h2>
+            <h2 className="card-title">{t("options.advanced.title")}</h2>
             <p className="card-desc">
-              调试日志（最近 {logs.length} 条）：在此页签中实时展示，或前往侧边面板 Logs 查看完整输出。
+              {t("options.advanced.desc", { count: String(logs.length) })}
             </p>
             <div className="console-logs" style={{ maxHeight: 300, overflowY: "auto" }}>
               {logs.length === 0 ? (
-                <div className="no-logs"><span>Waiting for system logs...</span></div>
+                <div className="no-logs"><span>{t("logs.waiting")}</span></div>
               ) : (
                 logs.map((l, i) => (
                   <div key={i} className="log-row">

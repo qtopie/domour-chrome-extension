@@ -17,6 +17,7 @@ import {
   statusClass,
   validateTrafficRule
 } from "../../types/trafficAnalysis";
+import { useI18n } from "../../i18n/I18nProvider";
 
 declare const chrome: any;
 
@@ -29,6 +30,7 @@ const EMPTY_RULE: TrafficRule = { pattern: "", action: "PROXY", enabled: true };
 const VPROXY_CA_PATH = "/tmp/vproxy-ca.crt";
 
 export default function TrafficAnalysisManager({ isExtension }: TrafficAnalysisManagerProps) {
+  const { t } = useI18n();
   const [config, setConfig] = useState<TrafficAnalysisConfig>(createEmptyTrafficAnalysis);
   const [subTab, setSubTab] = useState<"rules" | "capture">("rules");
   const [message, setMessage] = useState<string | null>(null);
@@ -67,7 +69,7 @@ export default function TrafficAnalysisManager({ isExtension }: TrafficAnalysisM
         setTraces(res.traces.map((t: VProxyTrace) => normalizeTrace(t)));
         setError(null);
       } else {
-        setError(res?.error ?? "抓取 trace 失败（vproxy Web :8899 不可达）");
+        setError(res?.error ?? t("ta.fetchFailed"));
       }
     });
   };
@@ -93,8 +95,8 @@ export default function TrafficAnalysisManager({ isExtension }: TrafficAnalysisM
 
   const validateRows = (): string | null => {
     for (const u of upstreamRows) {
-      const t = u.trim();
-      if (t && !/^(socks5?|http|https):\/\//i.test(t)) return `非法 upstream: ${t}`;
+      const val = u.trim();
+      if (val && !/^(socks5?|http|https):\/\//i.test(val)) return t("ta.invalidUpstream", { u: val });
     }
     for (const r of ruleRows) {
       if (!r.pattern.trim()) continue;
@@ -121,15 +123,21 @@ export default function TrafficAnalysisManager({ isExtension }: TrafficAnalysisM
     };
     if (!isExtension || typeof chrome === "undefined") {
       setConfig(next);
-      flash("已保存（本地预览）");
+      flash(t("ta.savedPreview"));
       return;
     }
     sendMessage<any>({ type: "SAVE_TRAFFIC_ANALYSIS", config: next }, (res) => {
       if (res && res.success) {
         setConfig(res.config);
-        flash(res.syncError ? `已保存，但规则同步失败：${res.syncError}` : "已保存" + (next.enabled ? "并同步 vproxy" : ""));
+        flash(
+          res.syncError
+            ? t("ta.savedSyncFailed", { err: res.syncError })
+            : next.enabled
+              ? t("ta.savedSyncedVproxy")
+              : t("ta.savedSynced")
+        );
       } else {
-        setError(res?.error ?? "保存失败");
+        setError(res?.error ?? t("ta.saveFailed"));
       }
     });
   };
@@ -145,9 +153,9 @@ export default function TrafficAnalysisManager({ isExtension }: TrafficAnalysisM
       setBusy(false);
       if (res && res.success) {
         setConfig((c) => ({ ...c, enabled: !!res.enabled }));
-        flash(next ? "流量分析已开启（Chrome 代理已切换至 vproxy :8118）" : "流量分析已关闭（已恢复原代理）");
+        flash(next ? t("ta.toggleOn") : t("ta.toggleOff"));
       } else {
-        setError(res?.error ?? "切换失败");
+        setError(res?.error ?? t("ta.toggleFailed"));
       }
     });
   };
@@ -157,9 +165,9 @@ export default function TrafficAnalysisManager({ isExtension }: TrafficAnalysisM
     sendMessage<any>({ type: "CLEAR_VPROXY_TRACES" }, (res) => {
       if (res && res.success) {
         setTraces([]);
-        flash("已清空");
+        flash(t("ta.cleared"));
       } else {
-        setError(res?.error ?? "清空失败");
+        setError(res?.error ?? t("ta.clearFailed"));
       }
     });
   };
@@ -180,11 +188,11 @@ export default function TrafficAnalysisManager({ isExtension }: TrafficAnalysisM
     for (const r of ruleRows) {
       if (!r.pattern.trim() || !r.enabled) continue;
       if (isLocalDevPattern(r.pattern) && (r.action === "PROXY" || r.action === "DIRECT")) {
-        hints.push(`「${r.pattern.trim()}」是本地开发域名，改用 INTERCEPT 才会被抓包分析。`);
+        hints.push(t("ta.localDevHint", { pattern: r.pattern.trim() }));
       }
     }
     return hints;
-  }, [ruleRows]);
+  }, [ruleRows, t]);
 
   const hasIntercept = ruleRows.some((r) => r.enabled && r.action === "INTERCEPT" && r.pattern.trim());
 
@@ -192,7 +200,7 @@ export default function TrafficAnalysisManager({ isExtension }: TrafficAnalysisM
     <div className="ta-rule-row" key={i}>
       <input
         className="hdr-kv-key"
-        placeholder="域名 / URL / PROCESS:xxx"
+        placeholder={t("ta.rulePatternPlaceholder")}
         value={r.pattern}
         onChange={(e) => updateRule(i, { pattern: e.target.value })}
       />
@@ -208,45 +216,45 @@ export default function TrafficAnalysisManager({ isExtension }: TrafficAnalysisM
       {r.action === "MAP" && (
         <input
           className="hdr-kv-value"
-          placeholder="file:///path 或 https://target"
+          placeholder={t("ta.mapTargetPlaceholder")}
           value={r.target ?? ""}
           onChange={(e) => updateRule(i, { target: e.target.value })}
         />
       )}
-      <label className="ta-enabled" title="启用此规则">
+      <label className="ta-enabled" title={t("ta.ruleEnabledTitle")}>
         <input
           type="checkbox"
           checked={r.enabled}
           onChange={(e) => updateRule(i, { enabled: e.target.checked })}
         />
-        启用
+        {t("common.enable")}
       </label>
-      <button className="popup-kv-del" onClick={() => removeRule(i)} title="删除">×</button>
+      <button className="popup-kv-del" onClick={() => removeRule(i)} title={t("ta.delete")}>×</button>
     </div>
   );
 
-  const renderTraceRow = (t: VProxyTrace) => {
-    const id = t.id ?? `${t.host ?? ""}-${t.timestamp ?? ""}-${t.method ?? ""}`;
+  const renderTraceRow = (trace: VProxyTrace) => {
+    const id = trace.id ?? `${trace.host ?? ""}-${trace.timestamp ?? ""}-${trace.method ?? ""}`;
     const expanded = expandedId === id;
-    const reqPairs = kvPairs(t.req_headers);
-    const respPairs = kvPairs(t.resp_headers);
+    const reqPairs = kvPairs(trace.req_headers);
+    const respPairs = kvPairs(trace.resp_headers);
     return (
       <div key={id} className={`ta-trace-row ${expanded ? "expanded" : ""}`}>
         <div className="ta-trace-head" onClick={() => setExpandedId(expanded ? null : id)}>
-          <span className="ta-trace-cell method">{t.method ?? "-"}</span>
-          <span className="ta-trace-cell host">{t.host ?? "-"}</span>
-          <span className="ta-trace-cell path" title={t.path}>{t.path ?? "-"}</span>
-          <span className={statusClass(t.status_code)}>{t.status_code ?? "-"}</span>
-          <span className="ta-trace-cell lat">{formatLatency(t.latency_ms)}</span>
+          <span className="ta-trace-cell method">{trace.method ?? "-"}</span>
+          <span className="ta-trace-cell host">{trace.host ?? "-"}</span>
+          <span className="ta-trace-cell path" title={trace.path}>{trace.path ?? "-"}</span>
+          <span className={statusClass(trace.status_code)}>{trace.status_code ?? "-"}</span>
+          <span className="ta-trace-cell lat">{formatLatency(trace.latency_ms)}</span>
           <span className="ta-trace-cell time">
-            {t.timestamp ? new Date(t.timestamp).toLocaleTimeString() : "-"}
+            {trace.timestamp ? new Date(trace.timestamp).toLocaleTimeString() : "-"}
           </span>
         </div>
         {expanded && (
           <div className="ta-trace-detail">
             <div className="ta-detail-grid">
               <div>
-                <div className="ta-detail-title">Request Headers</div>
+                <div className="ta-detail-title">{t("ta.reqHeaders")}</div>
                 {reqPairs.length === 0 ? <p className="card-desc">-</p> : (
                   <table className="ta-kv-table">
                     <tbody>
@@ -261,7 +269,7 @@ export default function TrafficAnalysisManager({ isExtension }: TrafficAnalysisM
                 )}
               </div>
               <div>
-                <div className="ta-detail-title">Response Headers</div>
+                <div className="ta-detail-title">{t("ta.respHeaders")}</div>
                 {respPairs.length === 0 ? <p className="card-desc">-</p> : (
                   <table className="ta-kv-table">
                     <tbody>
@@ -276,35 +284,35 @@ export default function TrafficAnalysisManager({ isExtension }: TrafficAnalysisM
                 )}
               </div>
             </div>
-            {t.req_body ? (
+            {trace.req_body ? (
               <div>
-                <div className="ta-detail-title">Request Body</div>
+                <div className="ta-detail-title">{t("ta.reqBody")}</div>
                 <pre className="ta-body">
-                  {bodyTruncated(t.req_body, fullBodyId === `req-${id}`)}
-                  {t.req_body.length > BODY_TRUNCATE && (
+                  {bodyTruncated(trace.req_body, fullBodyId === `req-${id}`)}
+                  {trace.req_body.length > BODY_TRUNCATE && (
                     <button
                       className="install-cta-btn secondary"
                       style={{ marginTop: "0.4rem" }}
                       onClick={() => setFullBodyId(fullBodyId === `req-${id}` ? null : `req-${id}`)}
                     >
-                      {fullBodyId === `req-${id}` ? "收起 Body" : "显示完整 Body"}
+                      {fullBodyId === `req-${id}` ? t("common.collapseBody") : t("common.showFullBody")}
                     </button>
                   )}
                 </pre>
               </div>
             ) : null}
-            {t.resp_body ? (
+            {trace.resp_body ? (
               <div>
-                <div className="ta-detail-title">Response Body</div>
+                <div className="ta-detail-title">{t("ta.respBody")}</div>
                 <pre className="ta-body">
-                  {bodyTruncated(t.resp_body, fullBodyId === `resp-${id}`)}
-                  {t.resp_body.length > BODY_TRUNCATE && (
+                  {bodyTruncated(trace.resp_body, fullBodyId === `resp-${id}`)}
+                  {trace.resp_body.length > BODY_TRUNCATE && (
                     <button
                       className="install-cta-btn secondary"
                       style={{ marginTop: "0.4rem" }}
                       onClick={() => setFullBodyId(fullBodyId === `resp-${id}` ? null : `resp-${id}`)}
                     >
-                      {fullBodyId === `resp-${id}` ? "收起 Body" : "显示完整 Body"}
+                      {fullBodyId === `resp-${id}` ? t("common.collapseBody") : t("common.showFullBody")}
                     </button>
                   )}
                 </pre>
@@ -320,8 +328,8 @@ export default function TrafficAnalysisManager({ isExtension }: TrafficAnalysisM
     <div className="ta-container">
       <section className="panel-card">
         <div className="card-header">
-          <h2 className="card-title">流量分析</h2>
-          <label className="ta-switch" title={config.enabled ? "关闭流量分析并恢复原代理" : "开启流量分析（Chrome 代理切换到 vproxy :8118）"}>
+          <h2 className="card-title">{t("ta.title")}</h2>
+          <label className="ta-switch" title={config.enabled ? t("ta.switchOff") : t("ta.switchOn")}>
             <input
               type="checkbox"
               checked={config.enabled}
@@ -329,13 +337,16 @@ export default function TrafficAnalysisManager({ isExtension }: TrafficAnalysisM
               onChange={(e) => toggleEnabled(e.target.checked)}
             />
             <span className="ta-switch-track" />
-            <span className="ta-switch-label">{busy ? "处理中…" : config.enabled ? "已开启 · vproxy :8118" : "已关闭"}</span>
+            <span className="ta-switch-label">{busy ? t("ta.busy") : config.enabled ? t("ta.enabled") : t("ta.disabled")}</span>
           </label>
         </div>
         <p className="card-desc">
-          开启后 Chrome 代理将切换到本地 vproxy HTTP 端口 <code className="inline-code">127.0.0.1:8118</code>，
-          按下方规则分流：<b>PROXY</b> 走上游代理、<b>INTERCEPT</b> 深度抓包（HTTPS 需信任 CA 证书）、
-          <b> MAP</b> 映射到本地/远程文件。关闭后自动恢复原代理配置。
+          {t("ta.desc", {
+            port: "127.0.0.1:8118",
+            proxy: "PROXY",
+            intercept: "INTERCEPT",
+            map: "MAP"
+          })}
         </p>
         {message && <div className="ta-flash">{message}</div>}
         {error && <div className="ta-flash error">{error}</div>}
@@ -345,49 +356,49 @@ export default function TrafficAnalysisManager({ isExtension }: TrafficAnalysisM
             className={`ta-subtab ${subTab === "rules" ? "active" : ""}`}
             onClick={() => setSubTab("rules")}
           >
-            规则
+            {t("ta.tabRules")}
           </button>
           <button
             className={`ta-subtab ${subTab === "capture" ? "active" : ""}`}
             onClick={() => setSubTab("capture")}
           >
-            抓包
+            {t("ta.tabTraces")}
           </button>
         </nav>
 
         {subTab === "rules" && (
           <div className="ta-rules-page">
             <div className="ta-section">
-              <div className="ta-section-title">Upstreams（上游代理）</div>
+              <div className="ta-section-title">{t("ta.upstreams")}</div>
               {upstreamRows.map((u, i) => (
                 <div className="hdr-kv-row" key={i}>
                   <input
                     className="hdr-kv-key"
-                    placeholder="socks5://192.168.50.31:1080 或 http://127.0.0.1:8080"
+                    placeholder={t("ta.upstreamPlaceholder")}
                     value={u}
                     onChange={(e) => updateUpstream(i, e.target.value)}
                   />
-                  <button className="popup-kv-del" onClick={() => removeUpstream(i)} title="删除">×</button>
+                  <button className="popup-kv-del" onClick={() => removeUpstream(i)} title={t("ta.delete")}>×</button>
                 </div>
               ))}
-              <button className="add-kv-btn" onClick={addUpstream}>+ 添加上游</button>
+              <button className="add-kv-btn" onClick={addUpstream}>{t("ta.addUpstream")}</button>
             </div>
 
             <div className="ta-section">
               <div className="ta-section-title">
-                站点规则
-                <span className="ta-hint-inline">含 `/` 按 URL 处理；`PROCESS:xxx` 按进程名处理；其余按域名</span>
+                {t("ta.siteRules")}
+                <span className="ta-hint-inline">{t("ta.ruleHint")}</span>
               </div>
               {ruleRows.map(renderRuleRow)}
-              <button className="add-kv-btn" onClick={addRule}>+ 添加规则</button>
-              <div className="ta-section-title" style={{ marginTop: "0.9rem" }}>FINAL 兜底动作</div>
+              <button className="add-kv-btn" onClick={addRule}>{t("ta.addRule")}</button>
+              <div className="ta-section-title" style={{ marginTop: "0.9rem" }}>{t("ta.finalAction")}</div>
               <select
                 className="ta-select"
                 value={config.finalAction}
                 onChange={(e) => setConfig((c) => ({ ...c, finalAction: e.target.value as "DIRECT" | "PROXY" }))}
               >
-                <option value="PROXY">PROXY（默认走代理）</option>
-                <option value="DIRECT">DIRECT（默认直连）</option>
+                <option value="PROXY">{t("ta.finalProxy")}</option>
+                <option value="DIRECT">{t("ta.finalDirect")}</option>
               </select>
             </div>
 
@@ -400,16 +411,16 @@ export default function TrafficAnalysisManager({ isExtension }: TrafficAnalysisM
             )}
             {hasIntercept && (
               <div className="ta-hint">
-                ⚠️ INTERCEPT 规则会解密 HTTPS 流量，请先在浏览器信任 CA 证书
+                {t("ta.caWarning")}
                 <code className="inline-code">{VPROXY_CA_PATH}</code>
-                （系统「证书」设置中导入为受信任的根证书）。
+                {t("ta.caWarning2")}
               </div>
             )}
 
             <div className="hdr-actions">
-              <button className="save-btn" onClick={save}>保存</button>
+              <button className="save-btn" onClick={save}>{t("ta.save")}</button>
               <button className="install-cta-btn secondary" onClick={() => setSubTab("capture")}>
-                查看抓包
+                {t("ta.viewTraces")}
               </button>
             </div>
           </div>
@@ -418,25 +429,25 @@ export default function TrafficAnalysisManager({ isExtension }: TrafficAnalysisM
         {subTab === "capture" && (
           <div className="ta-capture-page">
             <div className="ta-toolbar">
-              <button className="install-cta-btn secondary" onClick={loadTraces}>刷新</button>
+              <button className="install-cta-btn secondary" onClick={loadTraces}>{t("common.refresh")}</button>
               <label className="ta-enabled">
                 <input
                   type="checkbox"
                   checked={autoRefresh}
                   onChange={(e) => setAutoRefresh(e.target.checked)}
                 />
-                自动刷新 (3s)
+                {t("ta.autoRefresh")}
               </label>
-              <button className="clear-btn" onClick={clearTraces}>清空</button>
+              <button className="clear-btn" onClick={clearTraces}>{t("ta.clear")}</button>
             </div>
             <p className="card-desc">
-              仅 <b>INTERCEPT</b> / <b>MAP</b> 命中域名会产生完整抓包记录；普通 PROXY/DIRECT 仅透传、无记录。
+              {t("ta.traceHint", { intercept: "INTERCEPT", map: "MAP" })}
             </p>
             {traces.length === 0 ? (
               <div className="ta-empty">
-                <p>暂无抓包记录</p>
+                <p>{t("ta.noTraces")}</p>
                 <p className="card-desc">
-                  将需要分析的域名配置为 <b>INTERCEPT</b> 并开启流量分析，然后刷新页面触发请求。
+                  {t("ta.noTracesHint", { intercept: "INTERCEPT" })}
                 </p>
               </div>
             ) : (

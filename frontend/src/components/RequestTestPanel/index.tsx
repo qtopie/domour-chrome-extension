@@ -9,6 +9,7 @@ import {
   supportsBody
 } from "../../types/requestTest";
 import type { HeaderKV } from "../../types/requestHeaders";
+import { useI18n } from "../../i18n/I18nProvider";
 
 declare const chrome: any;
 
@@ -27,6 +28,7 @@ function statusClass(status: number): string {
 }
 
 export default function RequestTestPanel({ isExtension }: RequestTestPanelProps) {
+  const { t } = useI18n();
   const [composer, setComposer] = useState<RequestTestComposer>(createEmptyRequestTest);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<RequestTestResult | null>(null);
@@ -57,7 +59,7 @@ export default function RequestTestPanel({ isExtension }: RequestTestPanelProps)
       if (res && typeof res === "object" && "ok" in res) {
         setResult(res as RequestTestResult);
       } else {
-        setError(err ?? "请求失败（background 无响应）");
+        setError(err ?? t("rt.sendFailed"));
       }
     };
     if (!isExtension || typeof chrome === "undefined") {
@@ -67,7 +69,7 @@ export default function RequestTestPanel({ isExtension }: RequestTestPanelProps)
       return;
     }
     sendMessage<any>({ type: "TEST_REQUEST", composer }, (res) =>
-      finish(res, res?.error ?? "请求失败（background 无响应）")
+      finish(res, res?.error ?? t("rt.sendFailed"))
     );
   };
 
@@ -76,14 +78,15 @@ export default function RequestTestPanel({ isExtension }: RequestTestPanelProps)
   return (
     <div className="rt-panel">
       <div className="card-header">
-        <h2 className="card-title">请求测试</h2>
+        <h2 className="card-title">{t("rt.title")}</h2>
         <button className="chat-send-btn" onClick={send} disabled={sending}>
-          {sending ? "发送中…" : "发送"}
+          {sending ? t("common.sending") : t("common.send")}
         </button>
       </div>
       <p className="card-desc">
-        Postman 式请求测试：请求由后台 service worker 发起（<code className="inline-code">&lt;all_urls&gt;</code>
-        ，不受页面 CORS 限制）。若已开启流量分析，请求会经本地 vproxy，命中 INTERCEPT 规则即可同步抓包。
+        {t("rt.descPrefix")}
+        <code className="inline-code">&lt;all_urls&gt;</code>
+        {t("rt.descSuffix")}
       </p>
 
       <div className="rt-composer-row">
@@ -105,35 +108,35 @@ export default function RequestTestPanel({ isExtension }: RequestTestPanelProps)
         />
       </div>
 
-      <div className="rt-section-title">请求头</div>
+      <div className="rt-section-title">{t("rt.headers")}</div>
       <div className="hdr-kv-rows">
         {composer.headers.map((h, i) => (
           <div key={i} className="hdr-kv-row">
             <input
               className="hdr-kv-key"
-              placeholder="Header 名，如 X-Trace"
+              placeholder={t("rt.keyPlaceholder")}
               value={h.key}
               onChange={(e) => updateHeader(i, { key: e.target.value })}
             />
             <span className="hdr-kv-sep">:</span>
             <input
               className="hdr-kv-value"
-              placeholder="值"
+              placeholder={t("rt.valuePlaceholder")}
               value={h.value}
               onChange={(e) => updateHeader(i, { value: e.target.value })}
             />
-            <button className="clear-btn" onClick={() => removeHeader(i)} title="删除此行">✕</button>
+            <button className="clear-btn" onClick={() => removeHeader(i)} title={t("headers.deleteRowTitle")}>✕</button>
           </div>
         ))}
-        <button className="add-kv-btn" onClick={addHeader}>+ 添加 Header</button>
+        <button className="add-kv-btn" onClick={addHeader}>{t("headers.addHeader")}</button>
       </div>
 
       {supportsBody(composer.method) && (
         <>
-          <div className="rt-section-title">请求体</div>
+          <div className="rt-section-title">{t("rt.body")}</div>
           <textarea
             className="rt-body-input"
-            placeholder='JSON 或纯文本，如 {"key":"value"}'
+            placeholder={t("rt.bodyPlaceholder")}
             value={composer.body}
             onChange={(e) => setComposer((c) => ({ ...c, body: e.target.value }))}
           />
@@ -144,14 +147,14 @@ export default function RequestTestPanel({ isExtension }: RequestTestPanelProps)
 
       <div className="rt-response">
         {!result && !error && !sending && (
-          <div className="no-logs"><span>配置请求后点击「发送」，响应将在此展示</span></div>
+          <div className="no-logs"><span>{t("rt.noResult")}</span></div>
         )}
-        {sending && <div className="no-logs"><span>正在发送请求…</span></div>}
+        {sending && <div className="no-logs"><span>{t("rt.sending")}</span></div>}
         {result && (
           <div className="rt-response-body">
             <div className="rt-status-line">
               <span className={`rt-status ${statusClass(result.status)}`}>
-                {result.status === 0 ? "错误" : `${result.status} ${result.statusText}`}
+                {result.status === 0 ? t("rt.error") : `${result.status} ${result.statusText}`}
               </span>
               <span className="rt-latency">{result.latencyMs}ms</span>
               <span className="rt-final-url" title={result.finalUrl}>{result.finalUrl}</span>
@@ -160,9 +163,9 @@ export default function RequestTestPanel({ isExtension }: RequestTestPanelProps)
               <div className="rule-message rule-message-error">{result.error}</div>
             )}
 
-            <div className="ta-detail-title">响应头</div>
+            <div className="ta-detail-title">{t("rt.responseHeaders")}</div>
             {result.headers.length === 0 ? (
-              <div className="no-logs"><span>（空）</span></div>
+              <div className="no-logs"><span>{t("common.empty")}</span></div>
             ) : (
               <table className="ta-kv-table">
                 <tbody>
@@ -176,9 +179,9 @@ export default function RequestTestPanel({ isExtension }: RequestTestPanelProps)
               </table>
             )}
 
-            <div className="ta-detail-title" style={{ marginTop: "0.6rem" }}>响应体</div>
+            <div className="ta-detail-title" style={{ marginTop: "0.6rem" }}>{t("rt.responseBody")}</div>
             {result.truncated && (
-              <p className="card-desc">⚠️ 响应体过大，仅显示前 1MB（已截断）。</p>
+              <p className="card-desc">{t("rt.bodyTruncated")}</p>
             )}
             <pre className="ta-body">{formatBodyForDisplay(result.body, contentType)}</pre>
           </div>

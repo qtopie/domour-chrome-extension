@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { sendMessage } from "../../utils/sendMessage";
+import { useI18n } from "../../i18n/I18nProvider";
 
 declare const chrome: any;
 
@@ -10,6 +11,7 @@ interface PlaywrightManagerProps {
 }
 
 export default function PlaywrightManager({ token, isExtension, onLogMessage }: PlaywrightManagerProps) {
+  const { t } = useI18n();
   const [copiedToken, setCopiedToken] = useState<boolean>(false);
   const [copiedSnippet, setCopiedSnippet] = useState<boolean>(false);
   const [connectedTabs, setConnectedTabs] = useState<number[]>([]);
@@ -186,7 +188,7 @@ export default function PlaywrightManager({ token, isExtension, onLogMessage }: 
           <div className="endpoint-panel">
             <div className="snippet-header-row">
               <p className="card-desc">
-                将以下 JSON 配置到你的 AI 编程助手 MCP 客户端即可连接。
+                {t("pw.mcpSnippetDesc")}
               </p>
               <button onClick={copyConfigSnippet} className="copy-btn-text">
                 {copiedSnippet ? "Copied!" : "Copy JSON"}

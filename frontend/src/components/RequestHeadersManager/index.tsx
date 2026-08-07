@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import type { RequestHeadersConfig, HeaderKV } from "../../types/requestHeaders";
 import { createEmptyRequestHeaders, validateHeader } from "../../types/requestHeaders";
 import { sendMessage } from "../../utils/sendMessage";
+import { useI18n } from "../../i18n/I18nProvider";
 
 declare const chrome: any;
 
@@ -12,6 +13,7 @@ interface RequestHeadersManagerProps {
 const EMPTY_KV: HeaderKV = { key: "", value: "" };
 
 export default function RequestHeadersManager({ isExtension }: RequestHeadersManagerProps) {
+  const { t } = useI18n();
   const [config, setConfig] = useState<RequestHeadersConfig>(createEmptyRequestHeaders);
   const [globalRows, setGlobalRows] = useState<HeaderKV[]>([{ ...EMPTY_KV }]);
   const [hostInput, setHostInput] = useState("");
@@ -118,7 +120,7 @@ export default function RequestHeadersManager({ isExtension }: RequestHeadersMan
 
     if (!isExtension || typeof chrome === "undefined") {
       setConfig((c) => ({ ...c, global: { ...c.global, headers: globalHeaders }, perHost }));
-      flash("已保存（本地预览）");
+      flash(t("headers.savedPreview"));
       return;
     }
     sendMessage<any>(
@@ -126,9 +128,9 @@ export default function RequestHeadersManager({ isExtension }: RequestHeadersMan
       (res) => {
         if (res && res.success) {
           setConfig(res.config);
-          flash("已保存并应用");
+          flash(t("headers.savedApplied"));
         } else {
-          setError(res?.error ?? "保存失败");
+          setError(res?.error ?? t("headers.saveFailed"));
         }
       }
     );
@@ -156,23 +158,23 @@ export default function RequestHeadersManager({ isExtension }: RequestHeadersMan
         <div key={i} className="hdr-kv-row">
           <input
             className="hdr-kv-key"
-            placeholder="Header 名，如 X-Gray-Canal"
+            placeholder={t("headers.keyPlaceholder")}
             value={r.key}
             onChange={(e) => onUpdate(i, { key: e.target.value })}
           />
           <span className="hdr-kv-sep">:</span>
           <input
             className="hdr-kv-value"
-            placeholder="值，如 canary-1"
+            placeholder={t("headers.valuePlaceholder")}
             value={r.value}
             onChange={(e) => onUpdate(i, { value: e.target.value })}
           />
-          <button className="clear-btn" onClick={() => onRemove(i)} title="删除此行">
+          <button className="clear-btn" onClick={() => onRemove(i)} title={t("headers.deleteRowTitle")}>
             ✕
           </button>
         </div>
       ))}
-      <button className="add-kv-btn" onClick={onAdd}>+ 添加 Header</button>
+      <button className="add-kv-btn" onClick={onAdd}>{t("headers.addHeader")}</button>
     </div>
   );
 
@@ -180,10 +182,9 @@ export default function RequestHeadersManager({ isExtension }: RequestHeadersMan
 
   return (
     <section className="panel-card">
-      <h2 className="card-title">请求头</h2>
+      <h2 className="card-title">{t("headers.title")}</h2>
       <p className="card-desc">
-        为请求注入自定义 HTTP Header，用于调用链追踪与灰度测试。全局默认对所有匹配请求生效；
-        按域名覆盖优先（最长后缀匹配）。通过 MV3 declarativeNetRequest 声明式实现，不阻塞网络。
+        {t("headers.desc")}
       </p>
 
       {message && <div className="rule-message">{message}</div>}
@@ -191,9 +192,9 @@ export default function RequestHeadersManager({ isExtension }: RequestHeadersMan
 
       <div className="site-rule-row site-rule-global">
         <div className="site-rule-host">
-          全局默认
-          <label className="hdr-toggle-label" title="启用全局默认头">
-            <input type="checkbox" checked={config.global?.enabled !== false} onChange={toggleGlobal} /> 启用
+          {t("headers.globalDefault")}
+          <label className="hdr-toggle-label" title={t("headers.globalToggleTitle")}>
+            <input type="checkbox" checked={config.global?.enabled !== false} onChange={toggleGlobal} /> {t("common.enable")}
           </label>
         </div>
         {renderRows(globalRows, updateGlobalRow, removeGlobalRow, addGlobalRow)}
@@ -202,23 +203,23 @@ export default function RequestHeadersManager({ isExtension }: RequestHeadersMan
       <div className="chat-input-row" style={{ marginTop: "0.75rem" }}>
         <input
           className="chat-input"
-          placeholder="按域名覆盖，例如 example.com"
+          placeholder={t("headers.hostPlaceholder")}
           value={hostInput}
           onChange={(e) => setHostInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && addHost()}
         />
-        <button onClick={addHost} className="chat-send-btn">添加域名</button>
+        <button onClick={addHost} className="chat-send-btn">{t("headers.addHost")}</button>
       </div>
 
       {hosts.length === 0 ? (
-        <div className="no-logs"><span>尚未配置按域名覆盖的 Header</span></div>
+        <div className="no-logs"><span>{t("headers.noPerHost")}</span></div>
       ) : (
         hosts.map((host) => (
           <div key={host} className="site-rule-row">
             <div className="site-rule-host">
               {host}
               <button onClick={() => removeHost(host)} className="clear-btn" style={{ marginLeft: "0.5rem" }}>
-                删除
+                {t("headers.delete")}
               </button>
             </div>
             {renderRows(hostRows[host], (i, p) => updateHostRow(host, i, p), (i) => removeHostRow(host, i), () => addHostRow(host))}
@@ -227,10 +228,10 @@ export default function RequestHeadersManager({ isExtension }: RequestHeadersMan
       )}
 
       <div className="hdr-actions">
-        <button onClick={save} className="chat-send-btn">保存并应用</button>
+        <button onClick={save} className="chat-send-btn">{t("headers.saveApply")}</button>
       </div>
       <p className="card-desc" style={{ marginTop: "0.5rem", fontSize: "0.72rem" }}>
-        提示：浏览器保留的标准头（Cookie、Host、Content-Length 等）无法修改，建议使用 X- 前缀自定义头。
+        {t("headers.hint")}
       </p>
     </section>
   );
