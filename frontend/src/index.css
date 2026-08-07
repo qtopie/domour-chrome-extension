@@ -3,12 +3,31 @@
 :root {
   --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  color-scheme: light dark;
   
   --bg-app: #030712;
   --bg-card: rgba(17, 24, 39, 0.6);
   --bg-inner: #0b0f19;
   --border-color: rgba(31, 41, 55, 0.7);
   --border-glow: rgba(99, 102, 241, 0.15);
+
+  /* Surfaces with hard-coded dark rgba that must adapt in light mode */
+  --bg-header: rgba(10, 15, 26, 0.7);
+  --bg-header-inner: rgba(10, 15, 26, 0.4);
+  --bg-badge: rgba(0, 0, 0, 0.35);
+  --bg-fade: rgba(0, 0, 0, 0.25);
+  --bg-overlay: rgba(0, 0, 0, 0.75);
+  --bg-veil: rgba(0, 0, 0, 0.4);
+  --bg-btn-copy: #1e293b;
+  --bg-btn-copy-hover: #334155;
+  --bg-card-head: rgba(15, 23, 42, 0.2);
+  --bg-item-hover: rgba(17, 24, 39, 0.8);
+  --bg-modal: #0f172a;
+  --bg-scrollbar: #1e293b;
+  --bg-scrollbar-hover: #334155;
+  --shadow-card: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+  --shadow-card-lg: 0 12px 30px -5px rgba(0, 0, 0, 0.4);
+  --shadow-modal: 0 20px 40px rgba(0, 0, 0, 0.6);
   
   --primary: #6366f1;
   --primary-hover: #4f46e5;
@@ -30,6 +49,45 @@
   --text-main: #f3f4f6;
   --text-muted: #9ca3af;
   --text-dark: #6b7280;
+}
+
+/* Light theme — follows the OS / browser setting automatically. */
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg-app: #f4f6fb;
+    --bg-card: rgba(255, 255, 255, 0.85);
+    --bg-inner: #ffffff;
+    --border-color: rgba(31, 41, 55, 0.15);
+    --border-glow: rgba(99, 102, 241, 0.2);
+
+    --bg-header: rgba(255, 255, 255, 0.85);
+    --bg-header-inner: rgba(255, 255, 255, 0.7);
+    --bg-badge: rgba(255, 255, 255, 0.85);
+    --bg-fade: rgba(255, 255, 255, 0.5);
+    --bg-overlay: rgba(255, 255, 255, 0.9);
+    --bg-veil: rgba(255, 255, 255, 0.7);
+    --bg-btn-copy: #e2e8f0;
+    --bg-btn-copy-hover: #cbd5e1;
+    --bg-card-head: rgba(255, 255, 255, 0.5);
+    --bg-item-hover: rgba(255, 255, 255, 0.7);
+    --bg-modal: #ffffff;
+    --bg-scrollbar: #cbd5e1;
+    --bg-scrollbar-hover: #94a3b8;
+    --shadow-card: 0 10px 25px -5px rgba(31, 41, 55, 0.15);
+    --shadow-card-lg: 0 12px 30px -5px rgba(31, 41, 55, 0.2);
+    --shadow-modal: 0 20px 40px rgba(31, 41, 55, 0.25);
+
+    --success-bg: rgba(16, 185, 129, 0.15);
+    --error-bg: rgba(244, 63, 94, 0.12);
+    --warning-bg: rgba(245, 158, 11, 0.15);
+    --info-bg: rgba(56, 189, 248, 0.15);
+    --system-bg: rgba(168, 85, 247, 0.12);
+    --heartbeat-bg: rgba(107, 114, 128, 0.12);
+
+    --text-main: #111827;
+    --text-muted: #4b5563;
+    --text-dark: #6b7280;
+  }
 }
 
 /* Global Reset & Base */
@@ -64,7 +122,7 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 1rem 1.25rem;
-  background: rgba(10, 15, 26, 0.7);
+  background: var(--bg-header);
   backdrop-filter: blur(12px);
   border-b: 1px solid var(--border-color);
   z-index: 10;
@@ -89,7 +147,7 @@ body {
   font-size: 0.95rem;
   font-weight: 600;
   letter-spacing: 0.05em;
-  color: #ffffff;
+  color: var(--text-main);
 }
 
 .logo-highlight {
@@ -102,7 +160,7 @@ body {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background: rgba(0, 0, 0, 0.35);
+  background: var(--bg-badge);
   border: 1px solid var(--border-color);
   padding: 0.3rem 0.75rem;
   border-radius: 100px;
@@ -148,7 +206,7 @@ body {
   border: 1px solid var(--border-color);
   border-radius: 16px;
   padding: 1.25rem;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-card);
   backdrop-filter: blur(8px);
   display: flex;
   flex-direction: column;
@@ -158,7 +216,7 @@ body {
 
 .panel-card:hover {
   border-color: rgba(99, 102, 241, 0.25);
-  box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-card-lg);
 }
 
 .card-header {
@@ -216,7 +274,7 @@ body {
   flex: 1;
   font-family: var(--font-mono);
   font-size: 0.85rem;
-  color: #ffffff;
+  color: var(--text-main);
   letter-spacing: 0.05em;
   overflow-x: auto;
   white-space: nowrap;
@@ -227,7 +285,7 @@ body {
 }
 
 .copy-btn {
-  background: #1e293b;
+  background: var(--bg-btn-copy);
   color: var(--text-muted);
   border: 1px solid var(--border-color);
   padding: 0.45rem;
@@ -240,9 +298,9 @@ body {
 }
 
 .copy-btn:hover {
-  color: #ffffff;
-  background: #334155;
-  border-color: #475569;
+  color: var(--text-main);
+  background: var(--bg-btn-copy-hover);
+  border-color: var(--border-color);
 }
 
 .copy-btn.copied {
@@ -275,7 +333,7 @@ body {
 .console-card .card-header {
   padding: 1rem 1.25rem;
   border-bottom: 1px solid var(--border-color);
-  background: rgba(15, 23, 42, 0.2);
+  background: var(--bg-card-head);
 }
 
 /* Console Logs Viewport */
@@ -367,12 +425,12 @@ body {
 }
 
 .log-badge-info {
-  color: #f3f4f6;
-  background-color: rgba(255, 255, 255, 0.06);
+  color: var(--text-muted);
+  background-color: var(--heartbeat-bg);
 }
 
 .log-message {
-  color: #e2e8f0;
+  color: var(--text-main);
   word-break: break-all;
   white-space: pre-wrap;
 }
@@ -381,7 +439,7 @@ body {
 .footer {
   padding: 1rem 1.25rem;
   border-t: 1px solid var(--border-color);
-  background: rgba(10, 15, 26, 0.4);
+  background: var(--bg-header-inner);
   backdrop-filter: blur(8px);
 }
 
@@ -425,12 +483,12 @@ body {
 }
 
 .console-logs::-webkit-scrollbar-thumb {
-  background: #1e293b;
+  background: var(--bg-scrollbar);
   border-radius: 10px;
 }
 
 .console-logs::-webkit-scrollbar-thumb:hover {
-  background: #334155;
+  background: var(--bg-scrollbar-hover);
 }
 
 /* Keyframes */
@@ -452,7 +510,7 @@ body {
   display: flex;
   gap: 0.5rem;
   padding: 0.5rem 1.25rem 0;
-  background: rgba(10, 15, 26, 0.4);
+  background: var(--bg-header-inner);
   border-bottom: 1px solid var(--border-color);
 }
 
@@ -522,7 +580,7 @@ body {
 .active-title {
   font-size: 0.95rem;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--text-main);
 }
 
 .active-subtext {
@@ -546,7 +604,7 @@ body {
 .add-profile-btn:hover {
   background: rgba(99, 102, 241, 0.25);
   border-color: var(--primary);
-  color: #ffffff;
+  color: var(--text-main);
 }
 
 /* Profiles List */
@@ -570,7 +628,7 @@ body {
 
 .profile-item:hover {
   border-color: rgba(99, 102, 241, 0.3);
-  background: rgba(17, 24, 39, 0.8);
+  background: var(--bg-item-hover);
 }
 
 .profile-item.active-item {
@@ -625,7 +683,7 @@ body {
 .profile-name {
   font-size: 0.85rem;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--text-main);
 }
 
 .profile-scheme-tag {
@@ -678,7 +736,7 @@ body {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.75);
+  background: var(--bg-overlay);
   backdrop-filter: blur(6px);
   z-index: 100;
   display: flex;
@@ -692,14 +750,14 @@ body {
   max-width: 440px;
   max-height: 90vh;
   overflow-y: auto;
-  background: #0f172a;
+  background: var(--bg-modal);
   border: 1px solid var(--border-glow);
   border-radius: 16px;
   padding: 1.25rem;
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+  box-shadow: var(--shadow-modal);
 }
 
 .modal-header {
@@ -713,7 +771,7 @@ body {
 .modal-header h3 {
   font-size: 0.95rem;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--text-main);
 }
 
 .close-btn {
@@ -725,7 +783,7 @@ body {
 }
 
 .close-btn:hover {
-  color: #ffffff;
+  color: var(--text-main);
 }
 
 .modal-error-box {
@@ -760,7 +818,7 @@ body {
 .form-group input, .form-group textarea {
   background: var(--bg-inner);
   border: 1px solid var(--border-color);
-  color: #ffffff;
+  color: var(--text-main);
   padding: 0.55rem 0.75rem;
   border-radius: 8px;
   font-family: var(--font-sans);
@@ -807,7 +865,7 @@ body {
 }
 
 .color-dot.selected {
-  border-color: #ffffff;
+  border-color: var(--text-main);
   transform: scale(1.15);
 }
 
@@ -831,7 +889,7 @@ body {
 }
 
 .mode-btn:hover {
-  color: #ffffff;
+  color: var(--text-main);
   border-color: #475569;
 }
 
@@ -860,7 +918,7 @@ body {
 }
 
 .cancel-btn:hover {
-  color: #ffffff;
+  color: var(--text-main);
   border-color: #475569;
 }
 
@@ -952,7 +1010,7 @@ body {
 
 .info-val {
   font-weight: 700;
-  color: #ffffff;
+  color: var(--text-main);
 }
 
 .info-val.font-mono {
@@ -1002,7 +1060,7 @@ body {
   overflow-x: auto;
   font-family: var(--font-mono);
   font-size: 0.72rem;
-  color: #e2e8f0;
+  color: var(--text-main);
   line-height: 1.45;
 }
 
@@ -1107,7 +1165,7 @@ body {
 
 /* Expanded Panel */
 .nmh-expand-panel {
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--bg-fade);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 8px;
   padding: 0.7rem 0.85rem;
@@ -1190,7 +1248,7 @@ body {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--bg-veil);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 5px;
   padding: 0.3rem 0.5rem;
