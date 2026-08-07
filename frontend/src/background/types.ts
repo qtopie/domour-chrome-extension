@@ -36,4 +36,19 @@ export interface ChromeMessage {
   expression?: string;
   wait_selector?: string;
   wait_timeout?: string;
+  // Chat / notification channel (bridge ↔ background ↔ panels)
+  jobId?: string;
+  result?: string;
+  eventType?: string;
+  eventId?: string;
+  severity?: string;
+  symbol?: string;
+  price?: string | number;
+  changePct?: string | number;
+  alertLevel?: string | number;
+  host?: string;
+  patch?: Record<string, any>;
+  profileId?: string;
+  profile?: ProxyProfile;
+  enabled?: boolean;
 }

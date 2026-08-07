@@ -1,8 +1,26 @@
 import { appendLog, notifyPanelStatus } from './logger';
 import type { BridgeDisconnectReason } from './logger';
 import { executeAutomationJob } from './automation';
-import { initProxyState, applyProxyConfig, DEFAULT_PROFILES } from './proxy';
+import { initProxyState, applyProxyConfig, DEFAULT_PROFILES, BRIDGE_PAC_URL } from './proxy';
+import { DEFAULT_LAN_BYPASS } from '../types/proxy';
+import {
+  createEmptySiteRules,
+  setSiteRule,
+  removeSiteRule
+} from '../types/siteRules';
+import type { SiteRules } from '../types/siteRules';
 import type { ChromeMessage, ProxyProfile } from './types';
+
+function getSiteRules(callback: (rules: SiteRules) => void): void {
+  chrome.storage.local.get(["site_rules"], (res) => {
+    const rules = (res.site_rules as SiteRules) || createEmptySiteRules();
+    callback(rules);
+  });
+}
+
+function broadcastSiteRules(rules: SiteRules): void {
+  chrome.runtime.sendMessage({ type: "SITE_RULES_UPDATED", rules }).catch(() => {});
+}
 
 let nativePort: chrome.runtime.Port | null = null;
 let reconnectTimer: any = null;
@@ -100,9 +118,79 @@ function handleNativeMessage(msg: ChromeMessage): void {
       executeAutomationJob(msg, sendJobResponse);
       break;
 
+    case "CHAT_SEND":
+      appendLog("job", `Chat message from bridge: ${String(msg.message).slice(0, 80)}`);
+      handleChatStream(msg);
+      break;
+
+    case "AGENT_STREAM":
+      appendLog("job", `Agent stream chunk (${(msg.message || "").length} chars)`);
+      broadcastToPanels({ type: "AGENT_STREAM", jobId: msg.jobId, delta: msg.message || "" });
+      break;
+
+    case "AGENT_DONE":
+      appendLog("job", `Agent finished job ${msg.jobId}`);
+      persistChatTurn(msg.jobId || `chat_${Date.now()}`, "assistant", msg.result || "");
+      broadcastToPanels({ type: "AGENT_DONE", jobId: msg.jobId || `chat_${Date.now()}`, result: msg.result || "" });
+      break;
+
+    case "PUSH_EVENT":
+      appendLog("info", `Notification push received: ${msg.eventType || "event"}`);
+      handlePushEvent(msg);
+      break;
+
     default:
       appendLog("warning", `Unknown message type received from native host: ${JSON.stringify(msg)}`);
   }
+}
+
+function broadcastToPanels(payload: any): void {
+  chrome.runtime.sendMessage(payload).catch(() => {});
+}
+
+function handleChatStream(msg: ChromeMessage): void {
+  const jobId = msg.jobId || `chat_${Date.now()}`;
+  const text = msg.message || "";
+  persistChatTurn(jobId, "user", text);
+  broadcastToPanels({ type: "AGENT_STREAM", jobId, delta: text, role: "user" });
+  // Agent replies arrive as separate AGENT_STREAM/AGENT_DONE frames from bridge.
+}
+
+function persistChatTurn(jobId: string, role: string, text: string): void {
+  if (!text) return;
+  chrome.storage.local.get(["chat_history"], (res) => {
+    const history: any[] = (res.chat_history as any[]) || [];
+    history.push({ jobId, role, text, ts: Date.now() });
+    const trimmed = history.slice(-500);
+    chrome.storage.local.set({ chat_history: trimmed });
+  });
+}
+
+function handlePushEvent(msg: ChromeMessage): void {
+  // Token-validated PUSH_EVENT from bridge. Store + broadcast; badge when no panel is open.
+  const eventPayload = {
+    id: msg.eventId || `evt_${Date.now()}`,
+    severity: msg.severity || "info",
+    message: msg.message || "",
+    symbol: msg.symbol,
+    price: msg.price,
+    changePct: msg.changePct,
+    alertLevel: msg.alertLevel,
+    ts: Date.now()
+  };
+  chrome.storage.local.get(["events", "notify_enabled"], (res) => {
+    const notifyEnabled = res.notify_enabled !== false;
+    const events: any[] = (res.events as any[]) || [];
+    events.push(eventPayload);
+    chrome.storage.local.set({ events: events.slice(-200) }, () => {
+      broadcastToPanels({ type: "NOTIFY_PUSH", payload: eventPayload });
+      if (notifyEnabled) {
+        // Panel may be closed: badge count increments here; panel side clears on read.
+        chrome.action.setBadgeText({ text: String(Math.min((events.length % 99) + 1, 99)) });
+        chrome.action.setBadgeBackgroundColor({ color: "#ef4444" });
+      }
+    });
+  });
 }
 
 function handleVproxySync(data: ChromeMessage): void {
@@ -124,24 +212,15 @@ function handleVproxySync(data: ChromeMessage): void {
         host: vProfile.host || "127.0.0.1",
         port: vProfile.port || 18666,
         bypassList: Array.from(new Set([
-          "localhost",
-          "localhost:*",
-          "127.0.0.1",
-          "127.0.0.1:*",
-          "[::1]",
-          "[::1]:*",
-          "<-loopback>",
-          "192.168.0.0/16",
-          "192.168.*",
-          "10.0.0.0/8",
-          "10.*",
-          "172.16.0.0/12",
-          "*.local",
-          "*.lan",
+          ...DEFAULT_LAN_BYPASS,
           ...(Array.isArray(vProfile.bypassList) ? vProfile.bypassList : [])
         ])),
         pacType: vProfile.pacScript ? "script" : (vProfile.pacType || "url"),
-        pacUrl: vProfile.pacUrl || "http://127.0.0.1:26888/proxy.pac",
+        // Always pin the vproxy profile to the local bridge PAC. The PAC URL
+        // synced by the backend (e.g. vproxy web port) is often unreachable from
+        // the browser, which would leave the profile broken. The bridge PAC is
+        // guaranteed live and (per proxy.ts) wraps localhost/LAN as DIRECT.
+        pacUrl: BRIDGE_PAC_URL,
         pacScript: vProfile.pacScript,
         color: vProfile.color || "#8b5cf6",
         isVproxy: true,
@@ -293,6 +372,94 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === "getConnectionStatus") {
     sendResponse({ connectedTabIds: [], clientName: undefined });
     return false;
+  }
+
+  if (message.type === "GET_SITE_RULES") {
+    getSiteRules((rules) => sendResponse({ success: true, rules }));
+    return true;
+  }
+
+  if (message.type === "SET_SITE_RULE") {
+    const host = message.host;
+    const patch = message.patch;
+    if (typeof host !== "string" || !host || !patch || typeof patch !== "object") {
+      sendResponse({ success: false, error: "Invalid site rule payload" });
+      return false;
+    }
+    getSiteRules((rules) => {
+      const updated = setSiteRule(rules, host, patch);
+      chrome.storage.local.set({ site_rules: updated }, () => {
+        broadcastSiteRules(updated);
+        appendLog("info", `Site rule updated for ${host}: ${JSON.stringify(patch)}`);
+        sendResponse({ success: true, rules: updated });
+      });
+    });
+    return true;
+  }
+
+  if (message.type === "REMOVE_SITE_RULE") {
+    const host = message.host;
+    if (typeof host !== "string" || !host) {
+      sendResponse({ success: false, error: "Invalid host" });
+      return false;
+    }
+    getSiteRules((rules) => {
+      const updated = removeSiteRule(rules, host);
+      chrome.storage.local.set({ site_rules: updated }, () => {
+        broadcastSiteRules(updated);
+        appendLog("info", `Site rule removed for ${host}`);
+        sendResponse({ success: true, rules: updated });
+      });
+    });
+    return true;
+  }
+
+  if (message.type === "CHAT_SEND") {
+    const jobId = message.jobId || `chat_${Date.now()}`;
+    const text = message.message || "";
+    if (!text) {
+      sendResponse({ success: false, error: "Empty chat message" });
+      return false;
+    }
+    if (!nativePort) {
+      // Bridge offline: keep the message locally so it is not lost.
+      persistChatTurn(jobId, "user", text);
+      sendResponse({ success: false, error: "bridge offline" });
+      return false;
+    }
+    persistChatTurn(jobId, "user", text);
+    try {
+      nativePort.postMessage({ type: "CHAT_SEND", jobId, message: text });
+      sendResponse({ success: true, jobId });
+    } catch (e: any) {
+      sendResponse({ success: false, error: `Failed to dispatch to bridge: ${e.message}` });
+    }
+    return false;
+  }
+
+  if (message.type === "CHAT_HISTORY_GET") {
+    chrome.storage.local.get(["chat_history"], (res) => {
+      sendResponse({ success: true, history: (res.chat_history as any[]) || [] });
+    });
+    return true;
+  }
+
+  if (message.type === "GET_EVENTS") {
+    chrome.storage.local.get(["events"], (res) => {
+      sendResponse({ success: true, events: (res.events as any[]) || [] });
+    });
+    return true;
+  }
+
+  if (message.type === "NOTIFY_TOGGLE") {
+    const enabled = message.enabled !== false;
+    chrome.storage.local.set({ notify_enabled: enabled }, () => {
+      if (!enabled) {
+        chrome.action.setBadgeText({ text: "" });
+      }
+      sendResponse({ success: true, enabled });
+    });
+    return true;
   }
 
   if (message.type === "disconnect") {

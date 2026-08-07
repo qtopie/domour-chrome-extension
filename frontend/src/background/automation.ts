@@ -1,6 +1,29 @@
 import { appendLog } from './logger';
+import { resolveSiteRule, hostFromUrl } from '../types/siteRules';
+import type { SiteRules } from '../types/siteRules';
 
 const TAB_DRAG_RETRY_DELAYS = [150, 300, 600];
+
+// Chrome-protected pages cannot be injected with chrome.scripting.executeScript:
+// <all_urls> does not match the chrome-extension:// / chrome:// / edge:// schemes,
+// so Chrome rejects injection with "Cannot access contents of url ... Extension
+// manifest must request permission to access this host." Detect these targets so
+// automation degrades gracefully instead of surfacing an unchecked runtime error.
+const RESTRICTED_URL_PREFIXES = [
+  "chrome-extension://",
+  "chrome://",
+  "chrome-untrusted://",
+  "edge://",
+  "about:",
+  "devtools://",
+  "view-source:",
+  "https://chrome.google.com/webstore",
+  "https://microsoftedge.microsoft.com/addons"
+];
+
+function isRestrictedUrl(targetUrl: string): boolean {
+  return RESTRICTED_URL_PREFIXES.some((prefix) => targetUrl.startsWith(prefix));
+}
 
 function createTabWithRetry(
   createProperties: chrome.tabs.CreateProperties,
@@ -34,6 +57,31 @@ export function executeAutomationJob(
 ): void {
   const { action, url } = job;
 
+  // Site-level permission guard: if the resolved rule for this host forbids
+  // injection, refuse DOM automation (OPEN_AND_AUTOMATE, DOM actions,
+  // EVALUATE_JS, SNAPSHOT). Cookie extraction is separately gated by
+  // allow_cookie_extraction below (and by site_rules.cookies).
+  const injectionActions = new Set([
+    "OPEN_AND_AUTOMATE",
+    "CLICK", "TYPE", "FILL", "SELECT", "PRESS", "HOVER", "SNAPSHOT", "EVALUATE_JS"
+  ]);
+  if (injectionActions.has(action)) {
+    chrome.storage.local.get(["site_rules"], (res) => {
+      const host = hostFromUrl(url || "");
+      const rule = resolveSiteRule(res.site_rules as SiteRules, host);
+      if (!rule.inject) {
+        appendLog("warning", `Blocked ${action} on ${host}: site rule forbids injection.`);
+        sendJobResponse(url, "error", `Injection blocked by site rule for ${host}.`);
+        return;
+      }
+      dispatchAutomation();
+    });
+    return;
+  }
+
+  dispatchAutomation();
+
+  function dispatchAutomation(): void {
   if (action === "GET_COOKIES") {
     chrome.storage.local.get(["allow_cookie_extraction"], (res) => {
       const allowed = res.allow_cookie_extraction !== false;
@@ -123,6 +171,10 @@ export function executeAutomationJob(
   // Common tab runner for DOM automation tasks with SPA wait support
   const runDomScript = (scriptFunc: Function, args: any[] = [], jobOptions: any = {}) => {
     appendLog("job", `Executing DOM action [${action}] on URL: ${url}`);
+    if (isRestrictedUrl(url)) {
+      sendJobResponse(url, "error", `Cannot execute DOM action on protected URL (chrome://, chrome-extension://, etc): ${url}`);
+      return;
+    }
     createTabWithRetry({ url: url, active: true }, (tab) => {
       if (!tab || !tab.id) {
         sendJobResponse(url, "error", "Failed to create tab for DOM action");
@@ -325,6 +377,22 @@ export function executeAutomationJob(
         chrome.tabs.onUpdated.removeListener(tabUpdateListener);
         appendLog("job", `Tab ${tabId} loaded. Polling for SPA render completion...`);
 
+        if (isRestrictedUrl(url)) {
+          // Cannot inject into protected pages; return what the tabs API exposes.
+          appendLog("warning", `Cannot inject scripts into protected URL ${url}; returning basic tab info.`);
+          chrome.tabs.get(tabId, (tab) => {
+            sendJobResponse(url, "success", JSON.stringify({
+              title: tab?.title || "",
+              url: tab?.url || url,
+              innerText: "",
+              htmlLength: 0,
+              protectedPage: true
+            }));
+            chrome.tabs.remove(tabId).catch(() => {});
+          });
+          return;
+        }
+
         chrome.scripting.executeScript({
           target: { tabId: tabId },
           func: (maxWait: number) => {
@@ -394,4 +462,5 @@ export function executeAutomationJob(
       });
     }, 30000);
   });
+  }
 }

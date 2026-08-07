@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import type { ProxyProfile } from "../../types/proxy";
+import { DEFAULT_LAN_BYPASS } from "../../types/proxy";
 
 declare const chrome: any;
 
@@ -49,7 +50,7 @@ export default function ProxyManager({ isExtension, onLogMessage }: ProxyManager
           scheme: "socks5",
           host: "127.0.0.1",
           port: 1080,
-          bypassList: ["localhost", "127.0.0.1", "<-loopback>"],
+          bypassList: [...DEFAULT_LAN_BYPASS],
           color: "#3b82f6"
         }
       ];
@@ -125,7 +126,7 @@ export default function ProxyManager({ isExtension, onLogMessage }: ProxyManager
       scheme: "socks5",
       host: "127.0.0.1",
       port: 1080,
-      bypassList: ["localhost", "127.0.0.1"],
+      bypassList: [...DEFAULT_LAN_BYPASS],
       pacType: "url",
       pacUrl: "",
       pacScript: "function FindProxyForURL(url, host) {\n  return 'DIRECT';\n}"
@@ -172,14 +173,24 @@ export default function ProxyManager({ isExtension, onLogMessage }: ProxyManager
       }
     }
 
+    const cleanBypass = (editingProfile.bypassList || [])
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0 && line !== "<-loopback>" && line !== "<local>");
+
+    // fixed_servers profiles always carry the full LAN bypass: applyProxyConfig
+    // merges it unconditionally, so the stored list must match what is applied
+    // (otherwise the UI shows a list that never reflects the actual behavior).
+    const bypassList =
+      editingProfile.mode === "fixed_servers"
+        ? Array.from(new Set([...DEFAULT_LAN_BYPASS, ...cleanBypass]))
+        : cleanBypass;
+
     const payload = {
       ...editingProfile,
       name: editingProfile.name.trim(),
       host: editingProfile.host?.trim(),
       pacUrl: editingProfile.pacUrl?.trim(),
-      bypassList: (editingProfile.bypassList || [])
-        .map((line) => line.trim())
-        .filter((line) => line.length > 0)
+      bypassList
     };
 
     if (isExtension && typeof chrome !== "undefined" && chrome.runtime) {
@@ -523,7 +534,7 @@ export default function ProxyManager({ isExtension, onLogMessage }: ProxyManager
                     <label>Bypass List (One per line)</label>
                     <textarea
                       rows={3}
-                      placeholder="localhost&#10;127.0.0.1&#10;&lt;-loopback&gt;"
+                      placeholder="localhost&#10;127.0.0.1&#10;*.example.com"
                       value={(editingProfile.bypassList || []).join("\n")}
                       onChange={(e) =>
                         setEditingProfile({

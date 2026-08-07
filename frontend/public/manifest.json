@@ -21,6 +21,11 @@
   "side_panel": {
     "default_path": "index.html"
   },
+  "options_page": "options.html",
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
   "icons": {
     "16": "icon-16.png",
     "48": "icon-48.png",
@@ -32,7 +37,8 @@
       "48": "icon-48.png",
       "128": "icon-128.png"
     },
-    "default_title": "Domour Copilot"
+    "default_title": "Domour Copilot",
+    "default_popup": "popup.html"
   },
   "host_permissions": [
     "<all_urls>"

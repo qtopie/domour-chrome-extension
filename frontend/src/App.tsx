@@ -1,27 +1,24 @@
-import { useState, useEffect, useRef } from "react";
-import ProxyManager from "./components/ProxyManager";
+import { useState, useEffect } from "react";
 import PlaywrightManager from "./components/PlaywrightManager";
 import NmhInstallBanner from "./components/NmhInstallBanner";
+import OverviewPanel from "./components/OverviewPanel";
+import ChatPanel from "./components/ChatPanel";
+import TasksPanel from "./components/TasksPanel";
+import LogsPanel from "./components/LogsPanel";
+import type { LogEntry } from "./components/LogsPanel";
 
 declare const chrome: any;
 
-interface LogEntry {
-  timestamp: string;
-  level: string;
-  message: string;
-}
-
 type BridgeStatus = "CONNECTED" | "DISCONNECTED" | "NOT_INSTALLED";
+type TabKey = "overview" | "chat" | "tasks" | "logs";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"bridge" | "proxy" | "playwright">("bridge");
+  const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const [token, setToken] = useState<string>("");
   const [bridgeStatus, setBridgeStatus] = useState<BridgeStatus>("DISCONNECTED");
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [copied, setCopied] = useState<boolean>(false);
   const [isExtension, setIsExtension] = useState<boolean>(false);
-  const logsEndRef = useRef<HTMLDivElement>(null);
 
   // Check if we are running inside a real Edge/Chrome Extension environment
   useEffect(() => {
@@ -39,7 +36,6 @@ export default function App() {
         } else {
           chrome.storage.local.set({ api_token: FIXED_TOKEN }, () => {
             setToken(FIXED_TOKEN);
-            // Notify background worker that token has been initialized
             chrome.runtime.sendMessage({ type: "RECONNECT" }).catch(() => {});
           });
         }
@@ -53,17 +49,20 @@ export default function App() {
       });
 
       // 3. Check Native Bridge Connection State
-      chrome.runtime.sendMessage({ type: "CHECK_CONNECTION" }, (response: { connected?: boolean; reason?: string }) => {
-        if (response && response.connected !== undefined) {
-          const connected = response.connected;
-          setIsConnected(connected);
-          if (connected) {
-            setBridgeStatus("CONNECTED");
-          } else {
-            setBridgeStatus((response.reason as BridgeStatus) ?? "DISCONNECTED");
+      chrome.runtime.sendMessage(
+        { type: "CHECK_CONNECTION" },
+        (response: { connected?: boolean; reason?: string }) => {
+          if (response && response.connected !== undefined) {
+            const connected = response.connected;
+            setIsConnected(connected);
+            if (connected) {
+              setBridgeStatus("CONNECTED");
+            } else {
+              setBridgeStatus((response.reason as BridgeStatus) ?? "DISCONNECTED");
+            }
           }
         }
-      });
+      );
 
       // 4. Set up message listener for incoming logs or status updates from background
       const messageListener = (message: any) => {
@@ -99,13 +98,6 @@ export default function App() {
     }
   }, []);
 
-  // Scroll to bottom on new log entry if in bridge tab
-  useEffect(() => {
-    if (activeTab === "bridge") {
-      logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [logs, activeTab]);
-
   // Generates cryptographically secure random API token prefixed with tk_
   const generateToken = (): string => {
     const array = new Uint8Array(15);
@@ -130,19 +122,12 @@ export default function App() {
   };
 
   const appendSystemLog = (level: string, message: string) => {
-    const entry = {
+    const entry: LogEntry = {
       timestamp: new Date().toLocaleTimeString(),
       level,
       message
     };
     setLogs((prev) => [...prev, entry]);
-  };
-
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(token).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
   };
 
   const triggerReconnect = () => {
@@ -160,17 +145,6 @@ export default function App() {
     setLogs([]);
     if (isExtension) {
       chrome.storage.local.set({ logs: [] });
-    }
-  };
-
-  const getLogLevelLabel = (level: string) => {
-    switch (level) {
-      case "error": return "ERR";
-      case "warning": return "WRN";
-      case "system": return "SYS";
-      case "heartbeat": return "HBT";
-      case "job": return "JOB";
-      default: return "INF";
     }
   };
 
@@ -199,7 +173,7 @@ export default function App() {
             </defs>
           </svg>
           <h1 className="logo-text">
-            COSMOS <span className="logo-highlight">BRIDGE</span>
+            COSMOS <span className="logo-highlight">WORKSPACE</span>
           </h1>
         </div>
         <div className="status-badge">
@@ -218,108 +192,63 @@ export default function App() {
       {/* Navigation Tab Bar */}
       <nav className="tab-nav">
         <button
-          className={`tab-btn ${activeTab === "bridge" ? "active" : ""}`}
-          onClick={() => setActiveTab("bridge")}
+          className={`tab-btn ${activeTab === "overview" ? "active" : ""}`}
+          onClick={() => setActiveTab("overview")}
+        >
+          <svg className="tab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+          </svg>
+          概览
+        </button>
+        <button
+          className={`tab-btn ${activeTab === "chat" ? "active" : ""}`}
+          onClick={() => setActiveTab("chat")}
+        >
+          <svg className="tab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+          </svg>
+          Chat
+        </button>
+        <button
+          className={`tab-btn ${activeTab === "tasks" ? "active" : ""}`}
+          onClick={() => setActiveTab("tasks")}
+        >
+          <svg className="tab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+          </svg>
+          Tasks
+        </button>
+        <button
+          className={`tab-btn ${activeTab === "logs" ? "active" : ""}`}
+          onClick={() => setActiveTab("logs")}
         >
           <svg className="tab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
           </svg>
-          Bridge & Logs
-        </button>
-        <button
-          className={`tab-btn ${activeTab === "proxy" ? "active" : ""}`}
-          onClick={() => setActiveTab("proxy")}
-        >
-          <svg className="tab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457-.315-2.84-.878-4.085" />
-          </svg>
-          Proxy Manager
-        </button>
-        <button
-          className={`tab-btn ${activeTab === "playwright" ? "active" : ""}`}
-          onClick={() => setActiveTab("playwright")}
-        >
-          <svg className="tab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5l7 7-7 7" />
-          </svg>
-          MCP Server
+          Logs
         </button>
       </nav>
 
       {/* Main Container */}
       <main className="main-content">
-        {activeTab === "bridge" ? (
+        {activeTab === "overview" && (
+          <OverviewPanel
+            token={token}
+            isConnected={isConnected}
+            bridgeStatus={bridgeStatus}
+            onRegenerateToken={regenerateToken}
+            onReconnect={triggerReconnect}
+          />
+        )}
+        {activeTab === "chat" && (
           <>
-            {/* Token Section */}
-            <section className="panel-card">
-              <div className="card-header">
-                <h2 className="card-title">Access Token Lock</h2>
-                <button onClick={regenerateToken} className="regenerate-btn">
-                  Regenerate
-                </button>
-              </div>
-
-              <div className="token-box">
-                <code className="token-code">{token}</code>
-                <button
-                  onClick={copyToClipboard}
-                  className={`copy-btn ${copied ? "copied" : ""}`}
-                  title="Copy token"
-                >
-                  {copied ? (
-                    <svg className="svg-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  ) : (
-                    <svg className="svg-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-                    </svg>
-                  )}
-                </button>
-              </div>
-
-              <p className="card-desc">
-                Ensure external job requests written to your temp directory contain this token. Unauthorized jobs will be instantly deleted.
-              </p>
-            </section>
-
-            {/* Console / Live Logs Section */}
-            <section className="panel-card console-card">
-              <div className="card-header">
-                <h2 className="card-title">Live Logs</h2>
-                <button onClick={clearLogs} className="clear-btn">
-                  Clear Logs
-                </button>
-              </div>
-
-              {/* Logs View */}
-              <div className="console-logs">
-                {logs.length === 0 ? (
-                  <div className="no-logs">
-                    <svg className="no-logs-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <span>Waiting for system logs...</span>
-                  </div>
-                ) : (
-                  logs.map((logEntry, index) => (
-                    <div key={index} className="log-row">
-                      <span className="log-time">{logEntry.timestamp}</span>
-                      <span className={`log-badge log-badge-${logEntry.level}`}>
-                        {getLogLevelLabel(logEntry.level)}
-                      </span>
-                      <span className="log-message">{logEntry.message}</span>
-                    </div>
-                  ))
-                )}
-                <div ref={logsEndRef} />
-              </div>
-            </section>
+            <ChatPanel isExtension={isExtension} onLogMessage={appendSystemLog} />
+            <PlaywrightManager token={token} isExtension={isExtension} onLogMessage={appendSystemLog} />
           </>
-        ) : activeTab === "proxy" ? (
-          <ProxyManager isExtension={isExtension} onLogMessage={appendSystemLog} />
-        ) : (
-          <PlaywrightManager token={token} isExtension={isExtension} onLogMessage={appendSystemLog} />
+        )}
+        {activeTab === "tasks" && <TasksPanel isExtension={isExtension} />}
+        {activeTab === "logs" && (
+          <LogsPanel logs={logs} onClearLogs={clearLogs} />
         )}
       </main>
 
