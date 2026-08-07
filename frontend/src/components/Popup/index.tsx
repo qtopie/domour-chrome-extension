@@ -1,5 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { resolveSiteRule, hostFromUrl } from "../../types/siteRules";
+import { matchPerHost } from "../../types/requestHeaders";
+import type { HeaderKV } from "../../types/requestHeaders";
 
 declare const chrome: any;
 
@@ -10,12 +12,20 @@ interface ProxyProfile {
   [key: string]: any;
 }
 
+interface HdrEdit {
+  key: string;
+  value: string;
+}
+
 export default function PopupApp() {
   const [profiles, setProfiles] = useState<ProxyProfile[]>([]);
   const [activeProfileId, setActiveProfileId] = useState<string>("direct");
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [currentHost, setCurrentHost] = useState<string>("");
   const [rule, setRule] = useState<any>(null);
+  const [hdrKvs, setHdrKvs] = useState<HdrEdit[]>([]);
+  const [hdrDirty, setHdrDirty] = useState<boolean>(false);
+  const hdrDirtyRef = useRef(false);
 
   useEffect(() => {
     const hasChrome = typeof chrome !== "undefined" && chrome.storage && chrome.storage.local;
@@ -51,6 +61,7 @@ export default function PopupApp() {
             setRule(resolveSiteRule(res.rules, host));
           }
         });
+        loadHostHeaders(host);
       }
     });
 
@@ -61,9 +72,67 @@ export default function PopupApp() {
         if (msg.activeProfileId) setActiveProfileId(msg.activeProfileId);
       } else if (msg.type === "SITE_RULES_UPDATED" && msg.rules) {
         if (currentHost) setRule(resolveSiteRule(msg.rules, currentHost));
+      } else if (msg.type === "REQUEST_HEADERS_UPDATED" && msg.config) {
+        const host = currentHost || "";
+        if (host && !hdrDirtyRef.current) syncHeadersFromConfig(msg.config, host);
       }
     });
   }, [currentHost]);
+
+  const syncHeadersFromConfig = (config: any, host: string) => {
+    const matched = matchPerHost(config, host);
+    const headers: HeaderKV[] = matched ? config.perHost?.[matched]?.headers ?? [] : [];
+    setHdrKvs(headers.map((h) => ({ key: h.key, value: h.value })));
+    hdrDirtyRef.current = false;
+    setHdrDirty(false);
+  };
+
+  const loadHostHeaders = (host: string) => {
+    if (!host) return;
+    chrome.runtime.sendMessage({ type: "GET_REQUEST_HEADERS" }, (res: any) => {
+      if (res && res.success && res.config) syncHeadersFromConfig(res.config, host);
+    });
+  };
+
+  const updateKv = (i: number, field: "key" | "value", val: string) => {
+    hdrDirtyRef.current = true;
+    setHdrDirty(true);
+    setHdrKvs((prev) => prev.map((kv, idx) => (idx === i ? { ...kv, [field]: val } : kv)));
+  };
+
+  const addKvRow = () => {
+    hdrDirtyRef.current = true;
+    setHdrDirty(true);
+    setHdrKvs((prev) => [...prev, { key: "", value: "" }]);
+  };
+
+  const removeKvRow = (i: number) => {
+    hdrDirtyRef.current = true;
+    setHdrDirty(true);
+    setHdrKvs((prev) => prev.filter((_, idx) => idx !== i));
+  };
+
+  const saveHostHeaders = () => {
+    if (!currentHost) return;
+    const headers = hdrKvs
+      .filter((kv) => kv.key.trim() !== "")
+      .map((kv) => ({ key: kv.key.trim(), value: kv.value }));
+    if (headers.length === 0) {
+      chrome.runtime.sendMessage(
+        { type: "REMOVE_HOST_HEADERS", host: currentHost },
+        (res: any) => {
+          if (res && res.success && res.config) syncHeadersFromConfig(res.config, currentHost);
+        }
+      );
+      return;
+    }
+    chrome.runtime.sendMessage(
+      { type: "SET_HOST_HEADERS", host: currentHost, headers },
+      (res: any) => {
+        if (res && res.success && res.config) syncHeadersFromConfig(res.config, currentHost);
+      }
+    );
+  };
 
   const switchProfile = (id: string) => {
     setActiveProfileId(id);
@@ -122,6 +191,48 @@ export default function PopupApp() {
               <input type="checkbox" checked={!!rule?.cookies} onChange={() => toggleSiteFlag("cookies")} />
               允许 Cookie
             </label>
+          </div>
+        ) : (
+          <p className="popup-muted">无活动标签页</p>
+        )}
+      </section>
+
+      <section className="popup-section">
+        <h3 className="popup-section-title">当前站点请求头</h3>
+        {currentHost ? (
+          <div className="hdr-kv-rows popup-hdr-rows">
+            {hdrKvs.length === 0 && <p className="popup-muted">未设置，添加 Key/Value 后保存</p>}
+            {hdrKvs.map((kv, i) => (
+              <div key={i} className="hdr-kv-row">
+                <input
+                  className="hdr-kv-key"
+                  placeholder="Key"
+                  value={kv.key}
+                  onChange={(e) => updateKv(i, "key", e.target.value)}
+                />
+                <span className="hdr-kv-sep">:</span>
+                <input
+                  className="hdr-kv-value"
+                  placeholder="Value"
+                  value={kv.value}
+                  onChange={(e) => updateKv(i, "value", e.target.value)}
+                />
+                <button className="popup-kv-del" onClick={() => removeKvRow(i)} title="删除此行">
+                  ×
+                </button>
+              </div>
+            ))}
+            <div className="hdr-actions">
+              <button className="add-kv-btn" onClick={addKvRow}>
+                + 添加
+              </button>
+              <button
+                className={`popup-options-btn ${hdrDirty ? "popup-btn-primary" : ""}`}
+                onClick={saveHostHeaders}
+              >
+                {hdrDirty ? "保存" : "已同步"}
+              </button>
+            </div>
           </div>
         ) : (
           <p className="popup-muted">无活动标签页</p>

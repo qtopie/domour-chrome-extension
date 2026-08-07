@@ -1837,6 +1837,35 @@ body {
   border-color: rgba(0, 242, 254, 0.5);
   color: var(--accent);
 }
+.popup-btn-primary {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+.popup-hdr-rows .hdr-kv-row {
+  gap: 0.3rem;
+}
+.popup-hdr-rows .hdr-kv-key,
+.popup-hdr-rows .hdr-kv-value {
+  padding: 0.32rem 0.4rem;
+  font-size: 0.7rem;
+}
+.popup-kv-del {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  line-height: 1;
+  padding: 0 0.15rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.popup-kv-del:hover {
+  color: #ff6b6b;
+}
+.popup-hdr-rows .hdr-actions {
+  margin-top: 0.5rem;
+}
 
 /* ===== Request Headers manager ===== */
 .hdr-kv-rows {

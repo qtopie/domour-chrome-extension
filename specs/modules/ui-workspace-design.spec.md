@@ -42,14 +42,20 @@
 │  [x] 绕过代理        [switch] │
 │  [ ] 采集 Cookie     [switch] │  ← 三开关，写 site_rules
 ├──────────────────────────────┤
-│ [打开侧边栏] [复制 Token] [🔔]  │ 通知提醒总开关
+│ 当前站点请求头 (example.com)   │
+│  [X-Trace-Id] : [abc-123] [×]│  ← KV 行，读写 request_headers
+│  [ + 添加 ]      [保存/已同步] │    perHost[host]
+├──────────────────────────────┤
+│ [打开设置]                     │  Options 快捷入口
 └──────────────────────────────┘
 ```
 
 **行为契约：**
 - 站点权限开关读写 `site_rules.<host>`，作用于**当前活动 tab** 的 hostname。
 - 切开关后立即广播 `SITE_RULES_UPDATED`，Side Panel 同步刷新。
+- 请求头 KV 行读写 `request_headers.perHost[<host>]`（经 `GET_REQUEST_HEADERS` / `SET_HOST_HEADERS` / `REMOVE_HOST_HEADERS` 消息），用于调用链追踪与灰度测试时快速修改当前站点的请求头。编辑后按钮显示「保存」，保存即写入 DNR 规则并广播 `REQUEST_HEADERS_UPDATED`；KV 全空时保存等价于移除该 host 规则。
 - 通知 🔔 是全局提醒总开关（背景 badge 是否显示），对应 storage key `notify_enabled`。
+- 「打开设置」按钮调用 `chrome.runtime.openOptionsPage()`，提供 Options Page 快捷入口。
 
 **Do NOT:** 日志、Profile 表单、Bridge 安装引导、高级设置。
 
@@ -187,6 +193,9 @@ interface SiteRules {
 | `CHAT_SEND` | panel → bg | `{ jobId, message }` 转发给 bridge→外部 Agent |
 | `CHAT_HISTORY_GET` | panel → bg | 拉取聊天记录 |
 | `NOTIFY_TOGGLE` | popup → bg | 切换通知总开关 |
+| `GET_REQUEST_HEADERS` | popup/options → bg | 拉取请求头配置 |
+| `SET_HOST_HEADERS` | popup → bg | 设置某 host 的请求头规则（写 perHost） |
+| `REMOVE_HOST_HEADERS` | popup → bg | 移除某 host 的请求头规则 |
 
 ---
 

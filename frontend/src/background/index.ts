@@ -14,7 +14,9 @@ import {
   validateHeader,
   buildDnrRuleSpecs,
   normalizeDnrRuleSpecs,
-  toggleGlobalHeaderRule
+  toggleGlobalHeaderRule,
+  setHeaderRule,
+  removeHeaderRule
 } from '../types/requestHeaders';
 import type { RequestHeadersConfig, HeaderKV } from '../types/requestHeaders';
 import type { ChromeMessage, ProxyProfile } from './types';
@@ -514,6 +516,43 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         broadcastRequestHeaders(next);
         appendLog("info", `Request header global toggle: ${enabled ? "ON" : "OFF"}.`);
         sendResponse({ success: true, enabled, config: next });
+      });
+    });
+    return true;
+  }
+
+  if (message.type === "SET_HOST_HEADERS") {
+    const host = typeof message.host === "string" ? message.host.trim().toLowerCase() : "";
+    const headers = validateHeaders(message.headers);
+    if (!host || !headers) {
+      sendResponse({ success: false, error: "Invalid host header payload" });
+      return false;
+    }
+    getRequestHeaders((config) => {
+      const next = setHeaderRule(config, host, headers, true);
+      chrome.storage.local.set({ request_headers: next }, () => {
+        syncDnrRules(next);
+        broadcastRequestHeaders(next);
+        appendLog("info", `Request header rule set for ${host} (${headers.length} headers).`);
+        sendResponse({ success: true, config: next });
+      });
+    });
+    return true;
+  }
+
+  if (message.type === "REMOVE_HOST_HEADERS") {
+    const host = typeof message.host === "string" ? message.host.trim().toLowerCase() : "";
+    if (!host) {
+      sendResponse({ success: false, error: "Invalid host" });
+      return false;
+    }
+    getRequestHeaders((config) => {
+      const next = removeHeaderRule(config, host);
+      chrome.storage.local.set({ request_headers: next }, () => {
+        syncDnrRules(next);
+        broadcastRequestHeaders(next);
+        appendLog("info", `Request header rule removed for ${host}.`);
+        sendResponse({ success: true, config: next });
       });
     });
     return true;
