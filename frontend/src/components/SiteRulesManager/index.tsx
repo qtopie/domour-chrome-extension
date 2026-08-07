@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import type { SiteRules, SiteRule } from "../../types/siteRules";
 import { createEmptySiteRules, setSiteRule, removeSiteRule } from "../../types/siteRules";
+import { sendMessage } from "../../utils/sendMessage";
 
 declare const chrome: any;
 
@@ -15,7 +16,7 @@ export default function SiteRulesManager({ isExtension }: SiteRulesManagerProps)
 
   useEffect(() => {
     if (!isExtension || typeof chrome === "undefined") return;
-    chrome.runtime.sendMessage({ type: "GET_SITE_RULES" }, (res: any) => {
+    sendMessage<any>({ type: "GET_SITE_RULES" }, (res) => {
       if (res && res.rules) setRules(res.rules);
     });
     chrome.runtime.onMessage.addListener((msg: any) => {
@@ -31,7 +32,7 @@ export default function SiteRulesManager({ isExtension }: SiteRulesManagerProps)
 
   const sendRuleUpdate = (host: string, patch: Partial<Omit<SiteRule, "host" | "source">>) => {
     if (!isExtension || typeof chrome === "undefined") return;
-    chrome.runtime.sendMessage({ type: "SET_SITE_RULE", host, patch }, (res: any) => {
+    sendMessage<any>({ type: "SET_SITE_RULE", host, patch }, (res) => {
       if (res && res.rules) setRules(res.rules);
     });
   };
@@ -58,7 +59,7 @@ export default function SiteRulesManager({ isExtension }: SiteRulesManagerProps)
       updateLocal(removeSiteRule(rules, host));
       return;
     }
-    chrome.runtime.sendMessage({ type: "REMOVE_SITE_RULE", host }, (res: any) => {
+    sendMessage<any>({ type: "REMOVE_SITE_RULE", host }, (res) => {
       if (res && res.rules) setRules(res.rules);
       setMessage(`已移除 ${host}`);
       setTimeout(() => setMessage(null), 2000);

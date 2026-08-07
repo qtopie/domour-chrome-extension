@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { sendMessage } from "./utils/sendMessage";
 import PlaywrightManager from "./components/PlaywrightManager";
 import NmhInstallBanner from "./components/NmhInstallBanner";
 import OverviewPanel from "./components/OverviewPanel";
@@ -48,9 +49,9 @@ export default function App() {
       });
 
       // 3. Check Native Bridge Connection State
-      chrome.runtime.sendMessage(
+      sendMessage<{ connected?: boolean; reason?: string }>(
         { type: "CHECK_CONNECTION" },
-        (response: { connected?: boolean; reason?: string }) => {
+        (response) => {
           if (response && response.connected !== undefined) {
             const connected = response.connected;
             setIsConnected(connected);
@@ -109,7 +110,7 @@ export default function App() {
   const triggerReconnect = () => {
     if (isExtension) {
       appendSystemLog("system", "Manual reconnection triggered...");
-      chrome.runtime.sendMessage({ type: "RECONNECT" }, (response: any) => {
+      sendMessage<any>({ type: "RECONNECT" }, (response) => {
         appendSystemLog("system", response?.status || "Triggered connection call.");
       });
     } else {

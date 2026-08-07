@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { sendMessage } from "../../utils/sendMessage";
 
 declare const chrome: any;
 
@@ -24,7 +25,7 @@ export default function TasksPanel({ isExtension }: TasksPanelProps) {
   // Load persisted events + notification preference.
   useEffect(() => {
     if (!isExtension || typeof chrome === "undefined") return;
-    chrome.runtime.sendMessage({ type: "GET_EVENTS" }, (res: any) => {
+    sendMessage<any>({ type: "GET_EVENTS" }, (res) => {
       if (res?.events) setEvents(res.events.slice(-100));
     });
     chrome.storage.local.get(["notify_enabled"], (res: any) => {
@@ -52,7 +53,7 @@ export default function TasksPanel({ isExtension }: TasksPanelProps) {
     const next = !notifyEnabled;
     setNotifyEnabled(next);
     if (isExtension && typeof chrome !== "undefined") {
-      chrome.runtime.sendMessage({ type: "NOTIFY_TOGGLE", enabled: next });
+      sendMessage({ type: "NOTIFY_TOGGLE", enabled: next });
     }
   };
 

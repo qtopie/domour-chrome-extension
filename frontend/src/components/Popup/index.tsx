@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { sendMessage } from "../../utils/sendMessage";
 import { resolveSiteRule, hostFromUrl } from "../../types/siteRules";
 import { matchPerHost } from "../../types/requestHeaders";
 import type { HeaderKV } from "../../types/requestHeaders";
@@ -32,7 +33,7 @@ export default function PopupApp() {
     if (!hasChrome) return;
 
     // 1. Proxy state
-    chrome.runtime.sendMessage({ type: "GET_PROXY_STATE" }, (res: any) => {
+    sendMessage<any>({ type: "GET_PROXY_STATE" }, (res) => {
       if (res) {
         setProfiles(res.profiles || []);
         setActiveProfileId(res.activeProfileId || "direct");
@@ -40,15 +41,15 @@ export default function PopupApp() {
     });
 
     // 2. Bridge status
-    chrome.runtime.sendMessage(
+    sendMessage<{ connected?: boolean }>(
       { type: "CHECK_CONNECTION" },
-      (response: { connected?: boolean }) => {
+      (response) => {
         if (response) setIsConnected(!!response.connected);
       }
     );
 
     // 3. Site rules + current tab host
-    chrome.runtime.sendMessage({ type: "GET_SITE_RULES" }, (res: any) => {
+    sendMessage<any>({ type: "GET_SITE_RULES" }, (res) => {
       if (res && res.rules) setRule(resolveSiteRule(res.rules, currentHost || ""));
     });
     chrome.tabs?.query({ active: true, currentWindow: true }, (tabs: any[]) => {
@@ -56,7 +57,7 @@ export default function PopupApp() {
       if (tab && tab.url) {
         const host = hostFromUrl(tab.url);
         setCurrentHost(host);
-        chrome.runtime.sendMessage({ type: "GET_SITE_RULES" }, (res: any) => {
+        sendMessage<any>({ type: "GET_SITE_RULES" }, (res) => {
           if (res && res.rules) {
             setRule(resolveSiteRule(res.rules, host));
           }
@@ -89,7 +90,7 @@ export default function PopupApp() {
 
   const loadHostHeaders = (host: string) => {
     if (!host) return;
-    chrome.runtime.sendMessage({ type: "GET_REQUEST_HEADERS" }, (res: any) => {
+    sendMessage<any>({ type: "GET_REQUEST_HEADERS" }, (res) => {
       if (res && res.success && res.config) syncHeadersFromConfig(res.config, host);
     });
   };
@@ -118,17 +119,17 @@ export default function PopupApp() {
       .filter((kv) => kv.key.trim() !== "")
       .map((kv) => ({ key: kv.key.trim(), value: kv.value }));
     if (headers.length === 0) {
-      chrome.runtime.sendMessage(
+      sendMessage<any>(
         { type: "REMOVE_HOST_HEADERS", host: currentHost },
-        (res: any) => {
+        (res) => {
           if (res && res.success && res.config) syncHeadersFromConfig(res.config, currentHost);
         }
       );
       return;
     }
-    chrome.runtime.sendMessage(
+    sendMessage<any>(
       { type: "SET_HOST_HEADERS", host: currentHost, headers },
-      (res: any) => {
+      (res) => {
         if (res && res.success && res.config) syncHeadersFromConfig(res.config, currentHost);
       }
     );
@@ -136,14 +137,14 @@ export default function PopupApp() {
 
   const switchProfile = (id: string) => {
     setActiveProfileId(id);
-    chrome.runtime.sendMessage({ type: "SET_ACTIVE_PROXY", profileId: id });
+    sendMessage({ type: "SET_ACTIVE_PROXY", profileId: id });
   };
 
   const toggleSiteFlag = (flag: "inject" | "bypassProxy" | "cookies") => {
     if (!currentHost) return;
     const current = rule;
     const patch = { [flag]: !(current ? current[flag] : false) };
-    chrome.runtime.sendMessage({ type: "SET_SITE_RULE", host: currentHost, patch }, (res: any) => {
+    sendMessage<any>({ type: "SET_SITE_RULE", host: currentHost, patch }, (res) => {
       if (res && res.rules && currentHost) {
         setRule(resolveSiteRule(res.rules, currentHost));
       }

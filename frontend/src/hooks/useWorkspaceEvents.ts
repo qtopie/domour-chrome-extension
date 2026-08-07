@@ -7,6 +7,10 @@ export function sendMessage<T = any>(message: any): Promise<T> {
   return new Promise<T>((resolve) => {
     try {
       chrome.runtime.sendMessage(message, (response: T) => {
+        if (chrome.runtime.lastError) {
+          resolve(undefined as T);
+          return;
+        }
         resolve(response);
       });
     } catch {

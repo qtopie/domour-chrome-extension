@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { sendMessage } from "../../utils/sendMessage";
 import type { RequestTestComposer, RequestTestResult } from "../../types/requestTest";
 import {
   HTTP_METHODS,
@@ -65,7 +66,7 @@ export default function RequestTestPanel({ isExtension }: RequestTestPanelProps)
         .catch((e: any) => finish(null, e?.message ?? String(e)));
       return;
     }
-    chrome.runtime.sendMessage({ type: "TEST_REQUEST", composer }, (res: any) =>
+    sendMessage<any>({ type: "TEST_REQUEST", composer }, (res) =>
       finish(res, res?.error ?? "请求失败（background 无响应）")
     );
   };

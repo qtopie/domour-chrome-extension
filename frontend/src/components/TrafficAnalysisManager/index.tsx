@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { sendMessage } from "../../utils/sendMessage";
 import type {
   TrafficAnalysisConfig,
   TrafficRule,
@@ -49,7 +50,7 @@ export default function TrafficAnalysisManager({ isExtension }: TrafficAnalysisM
 
   useEffect(() => {
     if (!isExtension || typeof chrome === "undefined") return;
-    chrome.runtime.sendMessage({ type: "GET_TRAFFIC_ANALYSIS" }, (res: any) => {
+    sendMessage<any>({ type: "GET_TRAFFIC_ANALYSIS" }, (res) => {
       if (res && res.config) applyLoaded(res.config);
     });
     const listener = (msg: any) => {
@@ -61,7 +62,7 @@ export default function TrafficAnalysisManager({ isExtension }: TrafficAnalysisM
 
   const loadTraces = () => {
     if (!isExtension || typeof chrome === "undefined") return;
-    chrome.runtime.sendMessage({ type: "FETCH_VPROXY_TRACES" }, (res: any) => {
+    sendMessage<any>({ type: "FETCH_VPROXY_TRACES" }, (res) => {
       if (res && res.success && Array.isArray(res.traces)) {
         setTraces(res.traces.map((t: VProxyTrace) => normalizeTrace(t)));
         setError(null);
@@ -123,7 +124,7 @@ export default function TrafficAnalysisManager({ isExtension }: TrafficAnalysisM
       flash("已保存（本地预览）");
       return;
     }
-    chrome.runtime.sendMessage({ type: "SAVE_TRAFFIC_ANALYSIS", config: next }, (res: any) => {
+    sendMessage<any>({ type: "SAVE_TRAFFIC_ANALYSIS", config: next }, (res) => {
       if (res && res.success) {
         setConfig(res.config);
         flash(res.syncError ? `已保存，但规则同步失败：${res.syncError}` : "已保存" + (next.enabled ? "并同步 vproxy" : ""));
@@ -140,7 +141,7 @@ export default function TrafficAnalysisManager({ isExtension }: TrafficAnalysisM
       setBusy(false);
       return;
     }
-    chrome.runtime.sendMessage({ type: "TOGGLE_TRAFFIC_ANALYSIS", enabled: next }, (res: any) => {
+    sendMessage<any>({ type: "TOGGLE_TRAFFIC_ANALYSIS", enabled: next }, (res) => {
       setBusy(false);
       if (res && res.success) {
         setConfig((c) => ({ ...c, enabled: !!res.enabled }));
@@ -153,7 +154,7 @@ export default function TrafficAnalysisManager({ isExtension }: TrafficAnalysisM
 
   const clearTraces = () => {
     if (typeof chrome === "undefined") return;
-    chrome.runtime.sendMessage({ type: "CLEAR_VPROXY_TRACES" }, (res: any) => {
+    sendMessage<any>({ type: "CLEAR_VPROXY_TRACES" }, (res) => {
       if (res && res.success) {
         setTraces([]);
         flash("已清空");

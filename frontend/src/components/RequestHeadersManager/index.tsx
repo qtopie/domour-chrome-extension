@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import type { RequestHeadersConfig, HeaderKV } from "../../types/requestHeaders";
 import { createEmptyRequestHeaders, validateHeader } from "../../types/requestHeaders";
+import { sendMessage } from "../../utils/sendMessage";
 
 declare const chrome: any;
 
@@ -20,7 +21,7 @@ export default function RequestHeadersManager({ isExtension }: RequestHeadersMan
 
   useEffect(() => {
     if (!isExtension || typeof chrome === "undefined") return;
-    chrome.runtime.sendMessage({ type: "GET_REQUEST_HEADERS" }, (res: any) => {
+    sendMessage<any>({ type: "GET_REQUEST_HEADERS" }, (res) => {
       if (res && res.config) {
         const cfg = res.config as RequestHeadersConfig;
         setConfig(cfg);
@@ -120,9 +121,9 @@ export default function RequestHeadersManager({ isExtension }: RequestHeadersMan
       flash("已保存（本地预览）");
       return;
     }
-    chrome.runtime.sendMessage(
+    sendMessage<any>(
       { type: "SAVE_REQUEST_HEADERS", globalHeaders, globalEnabled: config.global?.enabled !== false, perHost },
-      (res: any) => {
+      (res) => {
         if (res && res.success) {
           setConfig(res.config);
           flash("已保存并应用");
@@ -139,7 +140,7 @@ export default function RequestHeadersManager({ isExtension }: RequestHeadersMan
       setConfig((c) => ({ ...c, global: { ...c.global, enabled } }));
       return;
     }
-    chrome.runtime.sendMessage({ type: "TOGGLE_REQUEST_HEADERS", enabled }, (res: any) => {
+    sendMessage<any>({ type: "TOGGLE_REQUEST_HEADERS", enabled }, (res) => {
       if (res && res.success) setConfig(res.config);
     });
   };

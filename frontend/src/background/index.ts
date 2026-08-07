@@ -325,7 +325,26 @@ function handleVproxySync(data: ChromeMessage): void {
 
 // Global Message Handlers
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  try {
+    return handleRuntimeMessage(message, sendResponse);
+  } catch (e) {
+    // Never leave a message port open without a response — otherwise the
+    // sender sees "Unchecked runtime.lastError: The message port closed
+    // before a response was received."
+    const errMsg = e instanceof Error ? e.message : String(e);
+    appendLog("error", `Message handler crashed: ${errMsg}`);
+    try {
+      sendResponse({ success: false, error: `Handler crashed: ${errMsg}` });
+    } catch (_e) {
+      /* port already closed */
+    }
+    return false;
+  }
+});
+
+function handleRuntimeMessage(message: any, sendResponse: (response: any) => void): boolean {
   if (!message || !message.type) {
+    sendResponse({ success: false, error: "Missing message type" });
     return false;
   }
 
@@ -599,14 +618,19 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         broadcastTrafficAnalysis(next);
         appendLog("info", `Traffic analysis config saved (${next.rules.length} rules).`);
         if (next.enabled) {
-          syncVProxyRules(next).then((res) => {
-            if (res.success) {
-              appendLog("info", "Traffic rules synced to vproxy.");
-            } else {
-              appendLog("error", `Traffic rules sync failed: ${res.error}`);
-            }
-            sendResponse({ success: true, config: next, syncError: res.success ? undefined : res.error });
-          });
+          syncVProxyRules(next)
+            .then((res) => {
+              if (res.success) {
+                appendLog("info", "Traffic rules synced to vproxy.");
+              } else {
+                appendLog("error", `Traffic rules sync failed: ${res.error}`);
+              }
+              sendResponse({ success: true, config: next, syncError: res.success ? undefined : res.error });
+            })
+            .catch((e: any) => {
+              appendLog("error", `Traffic rules sync error: ${e instanceof Error ? e.message : String(e)}`);
+              sendResponse({ success: true, config: next, syncError: e instanceof Error ? e.message : String(e) });
+            });
         } else {
           sendResponse({ success: true, config: next });
         }
@@ -626,12 +650,26 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   if (message.type === "FETCH_VPROXY_TRACES") {
-    fetchVProxyTraces().then((res) => sendResponse(res));
+    fetchVProxyTraces()
+      .then((res) => sendResponse(res))
+      .catch((e: any) =>
+        sendResponse({
+          success: false,
+          error: e instanceof Error ? e.message : String(e)
+        })
+      );
     return true;
   }
 
   if (message.type === "FETCH_VPROXY_CONFIG") {
-    fetchVProxyConfig().then((res) => sendResponse(res));
+    fetchVProxyConfig()
+      .then((res) => sendResponse(res))
+      .catch((e: any) =>
+        sendResponse({
+          success: false,
+          error: e instanceof Error ? e.message : String(e)
+        })
+      );
     return true;
   }
 
@@ -712,8 +750,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return false;
   }
 
+  // Unknown message types: respond instead of returning false silently,
+  // otherwise the sender hits "message port closed before a response".
+  sendResponse({ success: false, error: `Unknown message type: ${message.type}` });
   return false;
-});
+}
 
 // Initialization
 chrome.storage.onChanged.addListener((changes, areaName) => {

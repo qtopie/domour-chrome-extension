@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { sendMessage } from "../../utils/sendMessage";
 
 declare const chrome: any;
 
@@ -28,7 +29,7 @@ export default function ChatPanel({ isExtension, onLogMessage }: ChatPanelProps)
   // Load persisted history on mount.
   useEffect(() => {
     if (!isExtension || typeof chrome === "undefined") return;
-    chrome.runtime.sendMessage({ type: "CHAT_HISTORY_GET" }, (res: any) => {
+    sendMessage<any>({ type: "CHAT_HISTORY_GET" }, (res) => {
       const history: any[] = res?.history || [];
       const mapped = history.map((h): ChatMessage => ({
         jobId: h.jobId,
@@ -84,7 +85,7 @@ export default function ChatPanel({ isExtension, onLogMessage }: ChatPanelProps)
     if (isExtension && typeof chrome !== "undefined") {
       setSending(true);
       setMessages((prev) => [...prev, { jobId, role: "user", text, done: true }]);
-      chrome.runtime.sendMessage({ type: "CHAT_SEND", jobId, message: text }, (res: any) => {
+      sendMessage<any>({ type: "CHAT_SEND", jobId, message: text }, (res) => {
         if (res && res.success === false) {
           setSending(false);
           setError(res.error || "发送失败");

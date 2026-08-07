@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { sendMessage } from "../../utils/sendMessage";
 import ProxyManager from "../ProxyManager";
 import SiteRulesManager from "../SiteRulesManager";
 import NotificationsManager from "../NotificationsManager";
@@ -32,9 +33,9 @@ export default function OptionsPage() {
     setIsExtension(!!hasChrome);
 
     if (hasChrome) {
-      chrome.runtime.sendMessage(
+      sendMessage<{ connected?: boolean }>(
         { type: "CHECK_CONNECTION" },
-        (response: { connected?: boolean }) => {
+        (response) => {
           if (response && response.connected !== undefined) setIsConnected(response.connected);
         }
       );

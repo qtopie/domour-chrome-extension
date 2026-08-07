@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { sendMessage } from "../../utils/sendMessage";
 
 declare const chrome: any;
 
@@ -26,7 +27,7 @@ export default function NotificationsManager({ isExtension }: NotificationsManag
     chrome.storage.local.get(["notify_enabled"], (res: any) => {
       setNotifyEnabled(res.notify_enabled !== false);
     });
-    chrome.runtime.sendMessage({ type: "GET_EVENTS" }, (res: any) => {
+    sendMessage<any>({ type: "GET_EVENTS" }, (res) => {
       if (res?.events) setEvents(res.events.slice(-50));
     });
   }, [isExtension]);
@@ -35,7 +36,7 @@ export default function NotificationsManager({ isExtension }: NotificationsManag
     const next = !notifyEnabled;
     setNotifyEnabled(next);
     if (isExtension && typeof chrome !== "undefined") {
-      chrome.runtime.sendMessage({ type: "NOTIFY_TOGGLE", enabled: next });
+      sendMessage({ type: "NOTIFY_TOGGLE", enabled: next });
     }
   };
 

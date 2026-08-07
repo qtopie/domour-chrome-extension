@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import type { ProxyProfile } from "../../types/proxy";
 import { DEFAULT_LAN_BYPASS } from "../../types/proxy";
+import { sendMessage } from "../../utils/sendMessage";
 
 declare const chrome: any;
 
@@ -23,7 +24,7 @@ export default function ProxyManager({ isExtension, onLogMessage }: ProxyManager
   // Load Proxy State from extension background or mock
   const fetchProxyState = () => {
     if (isExtension && typeof chrome !== "undefined" && chrome.runtime) {
-      chrome.runtime.sendMessage({ type: "GET_PROXY_STATE" }, (res: any) => {
+      sendMessage<any>({ type: "GET_PROXY_STATE" }, (res) => {
         if (res) {
           setProfiles(res.profiles || []);
           setActiveProfileId(res.activeProfileId || "direct");
@@ -80,7 +81,7 @@ export default function ProxyManager({ isExtension, onLogMessage }: ProxyManager
 
   const handleSetActiveProfile = (profileId: string) => {
     if (isExtension && typeof chrome !== "undefined" && chrome.runtime) {
-      chrome.runtime.sendMessage({ type: "SET_ACTIVE_PROXY", profileId }, (res: any) => {
+      sendMessage<any>({ type: "SET_ACTIVE_PROXY", profileId }, (res) => {
         if (res && res.success) {
           setActiveProfileId(profileId);
           onLogMessage?.("system", `Switched to proxy profile: ${res.activeProfile?.name || profileId}`);
@@ -99,7 +100,7 @@ export default function ProxyManager({ isExtension, onLogMessage }: ProxyManager
   const handleTriggerVproxySync = () => {
     setIsSyncing(true);
     if (isExtension && typeof chrome !== "undefined" && chrome.runtime) {
-      chrome.runtime.sendMessage({ type: "TRIGGER_VPROXY_SYNC" }, (res: any) => {
+      sendMessage<any>({ type: "TRIGGER_VPROXY_SYNC" }, (res) => {
         setIsSyncing(false);
         const msg = res?.status || "vproxy sync request dispatched.";
         onLogMessage?.("system", msg);
@@ -194,7 +195,7 @@ export default function ProxyManager({ isExtension, onLogMessage }: ProxyManager
     };
 
     if (isExtension && typeof chrome !== "undefined" && chrome.runtime) {
-      chrome.runtime.sendMessage({ type: "SAVE_PROXY_PROFILE", profile: payload }, (res: any) => {
+      sendMessage<any>({ type: "SAVE_PROXY_PROFILE", profile: payload }, (res) => {
         if (res && res.success) {
           setProfiles(res.profiles);
           setIsModalOpen(false);
@@ -228,7 +229,7 @@ export default function ProxyManager({ isExtension, onLogMessage }: ProxyManager
     }
 
     if (isExtension && typeof chrome !== "undefined" && chrome.runtime) {
-      chrome.runtime.sendMessage({ type: "DELETE_PROXY_PROFILE", profileId }, (res: any) => {
+      sendMessage<any>({ type: "DELETE_PROXY_PROFILE", profileId }, (res) => {
         if (res && res.success) {
           setProfiles(res.profiles);
           setActiveProfileId(res.activeProfileId);

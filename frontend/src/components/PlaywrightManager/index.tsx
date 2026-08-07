@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { sendMessage } from "../../utils/sendMessage";
 
 declare const chrome: any;
 
@@ -20,7 +21,7 @@ export default function PlaywrightManager({ token, isExtension, onLogMessage }: 
   useEffect(() => {
     if (isExtension && typeof chrome !== "undefined" && chrome.runtime) {
       const checkStatus = () => {
-        chrome.runtime.sendMessage({ type: "getConnectionStatus" }, (res: any) => {
+        sendMessage<any>({ type: "getConnectionStatus" }, (res) => {
           if (res) {
             setConnectedTabs(res.connectedTabIds || []);
             setClientName(res.clientName);
@@ -58,7 +59,7 @@ export default function PlaywrightManager({ token, isExtension, onLogMessage }: 
 
   const handleDisconnect = () => {
     if (isExtension && typeof chrome !== "undefined" && chrome.runtime) {
-      chrome.runtime.sendMessage({ type: "disconnect" }, (res: any) => {
+      sendMessage<any>({ type: "disconnect" }, (res) => {
         if (res && res.success) {
           setIsRelayActive(false);
           setConnectedTabs([]);
