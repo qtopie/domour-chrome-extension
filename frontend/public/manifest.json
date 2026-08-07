@@ -12,7 +12,8 @@
     "proxy",
     "tabGroups",
     "nativeMessaging",
-    "cookies"
+    "cookies",
+    "declarativeNetRequest"
   ],
   "background": {
     "service_worker": "background.js",

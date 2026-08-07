@@ -1837,3 +1837,86 @@ body {
   border-color: rgba(0, 242, 254, 0.5);
   color: var(--accent);
 }
+
+/* ===== Request Headers manager ===== */
+.hdr-kv-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+  width: 100%;
+}
+.hdr-kv-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.hdr-kv-key {
+  flex: 1 1 40%;
+  min-width: 0;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.75rem;
+  font-family: var(--font-mono, monospace);
+  background: var(--bg-inner);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-main);
+  outline: none;
+}
+.hdr-kv-key:focus,
+.hdr-kv-value:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+.hdr-kv-value {
+  flex: 1 1 60%;
+  min-width: 0;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.75rem;
+  background: var(--bg-inner);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-main);
+  outline: none;
+}
+.hdr-kv-sep {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+.add-kv-btn {
+  align-self: flex-start;
+  background: none;
+  border: 1px dashed var(--border-color);
+  color: var(--accent);
+  border-radius: 6px;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.72rem;
+  cursor: pointer;
+  font-family: var(--font-sans);
+}
+.add-kv-btn:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.hdr-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-left: 0.75rem;
+  cursor: pointer;
+}
+.hdr-toggle-label input[type="checkbox"] {
+  accent-color: #00f2fe;
+}
+.hdr-actions {
+  margin-top: 0.9rem;
+  display: flex;
+  gap: 0.6rem;
+}
+.rule-message-error {
+  color: #ff6b6b;
+  border-color: rgba(255, 107, 107, 0.35);
+}

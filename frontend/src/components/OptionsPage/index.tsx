@@ -2,10 +2,11 @@ import { useState, useEffect } from "react";
 import ProxyManager from "../ProxyManager";
 import SiteRulesManager from "../SiteRulesManager";
 import NotificationsManager from "../NotificationsManager";
+import RequestHeadersManager from "../RequestHeadersManager";
 
 declare const chrome: any;
 
-type TabKey = "general" | "proxy" | "bridge" | "notifications" | "siterules" | "advanced";
+type TabKey = "general" | "proxy" | "bridge" | "notifications" | "siterules" | "requestheaders" | "advanced";
 
 interface LogEntry {
   timestamp: string;
@@ -102,9 +103,6 @@ export default function OptionsPage() {
               </linearGradient>
             </defs>
           </svg>
-          <h1 className="logo-text">
-            COSMOS <span className="logo-highlight">SETTINGS</span>
-          </h1>
         </div>
         <div className="status-badge">
           <span className={`status-dot ${isConnected ? "active" : "offline"}`} />
@@ -120,6 +118,7 @@ export default function OptionsPage() {
             ["bridge", "桥接"],
             ["notifications", "通知"],
             ["siterules", "站点规则"],
+            ["requestheaders", "请求头"],
             ["advanced", "高级"],
           ] as [TabKey, string][]
         ).map(([key, label]) => (
@@ -283,6 +282,7 @@ export default function OptionsPage() {
         )}
         {activeTab === "notifications" && <NotificationsManager isExtension={isExtension} />}
         {activeTab === "siterules" && <SiteRulesManager isExtension={isExtension} />}
+        {activeTab === "requestheaders" && <RequestHeadersManager isExtension={isExtension} />}
         {activeTab === "advanced" && (
           <section className="panel-card">
             <h2 className="card-title">高级</h2>

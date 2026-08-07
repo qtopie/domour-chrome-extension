@@ -9,6 +9,14 @@ import {
   removeSiteRule
 } from '../types/siteRules';
 import type { SiteRules } from '../types/siteRules';
+import {
+  createEmptyRequestHeaders,
+  validateHeader,
+  buildDnrRuleSpecs,
+  normalizeDnrRuleSpecs,
+  toggleGlobalHeaderRule
+} from '../types/requestHeaders';
+import type { RequestHeadersConfig, HeaderKV } from '../types/requestHeaders';
 import type { ChromeMessage, ProxyProfile } from './types';
 
 function getSiteRules(callback: (rules: SiteRules) => void): void {
@@ -20,6 +28,59 @@ function getSiteRules(callback: (rules: SiteRules) => void): void {
 
 function broadcastSiteRules(rules: SiteRules): void {
   chrome.runtime.sendMessage({ type: "SITE_RULES_UPDATED", rules }).catch(() => {});
+}
+
+// --- Request Headers (custom header injection) ---
+
+function getRequestHeaders(callback: (config: RequestHeadersConfig) => void): void {
+  chrome.storage.local.get(["request_headers"], (res) => {
+    const config = (res.request_headers as RequestHeadersConfig) || createEmptyRequestHeaders();
+    callback(config);
+  });
+}
+
+function broadcastRequestHeaders(config: RequestHeadersConfig): void {
+  chrome.runtime.sendMessage({ type: "REQUEST_HEADERS_UPDATED", config }).catch(() => {});
+}
+
+/** Apply the config to declarativeNetRequest dynamic rules. */
+function syncDnrRules(config: RequestHeadersConfig): void {
+  if (typeof chrome === "undefined" || !chrome.declarativeNetRequest) {
+    appendLog("warn", "declarativeNetRequest unavailable — header rules not applied.");
+    return;
+  }
+  const specs = buildDnrRuleSpecs(config);
+  const rules = normalizeDnrRuleSpecs(specs);
+  const ruleIds = specs.map((s) => s.id);
+  chrome.declarativeNetRequest
+    .getDynamicRules()
+    .then((existing) => {
+      const existingIds = existing.map((r) => r.id);
+      return chrome.declarativeNetRequest.updateDynamicRules({
+        removeRuleIds: existingIds,
+        addRules: rules
+      });
+    })
+    .then(() => {
+      appendLog("info", `Request header DNR rules synced: ${ruleIds.length} active (${rules.length} raw).`);
+    })
+    .catch((e: any) => {
+      appendLog("error", `Failed to sync DNR rules: ${e.message}`);
+    });
+}
+
+function validateHeaders(headers: unknown): HeaderKV[] | null {
+  if (!Array.isArray(headers)) return null;
+  const clean: HeaderKV[] = [];
+  for (const h of headers) {
+    if (!h || typeof h !== "object") return null;
+    const key = typeof (h as any).key === "string" ? (h as any).key.trim() : "";
+    const value = typeof (h as any).value === "string" ? (h as any).value : "";
+    const err = validateHeader({ key, value });
+    if (err) return null;
+    if (key) clean.push({ key, value });
+  }
+  return clean;
 }
 
 let nativePort: chrome.runtime.Port | null = null;
@@ -414,6 +475,50 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === "GET_REQUEST_HEADERS") {
+    getRequestHeaders((config) => sendResponse({ success: true, config }));
+    return true;
+  }
+
+  if (message.type === "SAVE_REQUEST_HEADERS") {
+    const globalHeaders = validateHeaders(message.globalHeaders);
+    const perHost = message.perHost;
+    if (!globalHeaders || !perHost || typeof perHost !== "object") {
+      sendResponse({ success: false, error: "Invalid request header payload" });
+      return false;
+    }
+    const globalEnabled = message.globalEnabled !== false;
+    getRequestHeaders((config) => {
+      const next: RequestHeadersConfig = {
+        ...config,
+        global: { ...config.global, headers: globalHeaders, enabled: globalEnabled },
+        perHost,
+        _meta: { updatedAt: Date.now() }
+      };
+      chrome.storage.local.set({ request_headers: next }, () => {
+        syncDnrRules(next);
+        broadcastRequestHeaders(next);
+        appendLog("info", `Request header config saved (${globalHeaders.length} global, ${Object.keys(perHost).length} hosts).`);
+        sendResponse({ success: true, config: next });
+      });
+    });
+    return true;
+  }
+
+  if (message.type === "TOGGLE_REQUEST_HEADERS") {
+    const enabled = message.enabled !== false;
+    getRequestHeaders((config) => {
+      const next = toggleGlobalHeaderRule(config, enabled);
+      chrome.storage.local.set({ request_headers: next }, () => {
+        syncDnrRules(next);
+        broadcastRequestHeaders(next);
+        appendLog("info", `Request header global toggle: ${enabled ? "ON" : "OFF"}.`);
+        sendResponse({ success: true, enabled, config: next });
+      });
+    });
+    return true;
+  }
+
   if (message.type === "CHAT_SEND") {
     const jobId = message.jobId || `chat_${Date.now()}`;
     const text = message.message || "";
@@ -476,6 +581,11 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     appendLog("system", "API token updated in storage. Connecting to native bridge...");
     connectToNative();
   }
+});
+
+// Restore DNR rules after service worker (re)start so persisted header rules survive.
+getRequestHeaders((config) => {
+  syncDnrRules(config);
 });
 
 initProxyState();

@@ -84,7 +84,7 @@ export default function PopupApp() {
   return (
     <div className="popup-container">
       <header className="popup-header">
-        <span className="popup-title">COSMOS</span>
+        <span className="popup-title">Domour</span>
         <span className={`status-dot ${isConnected ? "active" : "offline"}`} />
         <span className="popup-status">{isConnected ? "ACTIVE" : "OFFLINE"}</span>
       </header>

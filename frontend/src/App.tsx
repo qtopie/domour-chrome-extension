@@ -148,9 +148,6 @@ export default function App() {
               </linearGradient>
             </defs>
           </svg>
-          <h1 className="logo-text">
-            COSMOS <span className="logo-highlight">WORKSPACE</span>
-          </h1>
         </div>
         <div className="status-badge">
           <span className={`status-dot ${isConnected ? "active" : "offline"}`} />
