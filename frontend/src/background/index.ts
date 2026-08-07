@@ -20,6 +20,17 @@ import {
 } from '../types/requestHeaders';
 import type { RequestHeadersConfig, HeaderKV } from '../types/requestHeaders';
 import type { ChromeMessage, ProxyProfile } from './types';
+import {
+  getTrafficConfig,
+  broadcastTrafficAnalysis,
+  fetchVProxyTraces,
+  fetchVProxyConfig,
+  clearVProxyTraces,
+  syncVProxyRules,
+  toggleTrafficAnalysis
+} from './trafficAnalysis';
+import { validateTrafficConfig } from '../types/trafficAnalysis';
+import type { TrafficAnalysisConfig } from '../types/trafficAnalysis';
 
 function getSiteRules(callback: (rules: SiteRules) => void): void {
   chrome.storage.local.get(["site_rules"], (res) => {
@@ -556,6 +567,76 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       });
     });
     return true;
+  }
+
+  if (message.type === "GET_TRAFFIC_ANALYSIS") {
+    getTrafficConfig((config) => sendResponse({ success: true, config }));
+    return true;
+  }
+
+  if (message.type === "SAVE_TRAFFIC_ANALYSIS") {
+    const incoming = message.config;
+    if (!incoming || typeof incoming !== "object") {
+      sendResponse({ success: false, error: "Invalid traffic analysis payload" });
+      return false;
+    }
+    const err = validateTrafficConfig(incoming as TrafficAnalysisConfig);
+    if (err) {
+      sendResponse({ success: false, error: err });
+      return false;
+    }
+    getTrafficConfig((prev) => {
+      const incomingCfg = incoming as TrafficAnalysisConfig;
+      const next: TrafficAnalysisConfig = {
+        ...incomingCfg,
+        _meta: {
+          updatedAt: Date.now(),
+          previousProxyId: incomingCfg._meta?.previousProxyId ?? prev._meta?.previousProxyId
+        }
+      };
+      chrome.storage.local.set({ traffic_analysis: next }, () => {
+        broadcastTrafficAnalysis(next);
+        appendLog("info", `Traffic analysis config saved (${next.rules.length} rules).`);
+        if (next.enabled) {
+          syncVProxyRules(next).then((res) => {
+            if (res.success) {
+              appendLog("info", "Traffic rules synced to vproxy.");
+            } else {
+              appendLog("error", `Traffic rules sync failed: ${res.error}`);
+            }
+            sendResponse({ success: true, config: next, syncError: res.success ? undefined : res.error });
+          });
+        } else {
+          sendResponse({ success: true, config: next });
+        }
+      });
+    });
+    return true;
+  }
+
+  if (message.type === "TOGGLE_TRAFFIC_ANALYSIS") {
+    const enabled = message.enabled !== false;
+    toggleTrafficAnalysis(enabled)
+      .then((res) => sendResponse(res))
+      .catch((e: any) =>
+        sendResponse({ success: false, error: e instanceof Error ? e.message : String(e) })
+      );
+    return true;
+  }
+
+  if (message.type === "FETCH_VPROXY_TRACES") {
+    fetchVProxyTraces().then((res) => sendResponse(res));
+    return true;
+  }
+
+  if (message.type === "FETCH_VPROXY_CONFIG") {
+    fetchVProxyConfig().then((res) => sendResponse(res));
+    return true;
+  }
+
+  if (message.type === "CLEAR_VPROXY_TRACES") {
+    sendResponse(clearVProxyTraces());
+    return false;
   }
 
   if (message.type === "CHAT_SEND") {

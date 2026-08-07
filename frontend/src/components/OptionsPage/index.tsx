@@ -3,10 +3,11 @@ import ProxyManager from "../ProxyManager";
 import SiteRulesManager from "../SiteRulesManager";
 import NotificationsManager from "../NotificationsManager";
 import RequestHeadersManager from "../RequestHeadersManager";
+import TrafficAnalysisManager from "../TrafficAnalysisManager";
 
 declare const chrome: any;
 
-type TabKey = "general" | "proxy" | "bridge" | "notifications" | "siterules" | "requestheaders" | "advanced";
+type TabKey = "general" | "proxy" | "bridge" | "notifications" | "siterules" | "requestheaders" | "traffic" | "advanced";
 
 interface LogEntry {
   timestamp: string;
@@ -119,6 +120,7 @@ export default function OptionsPage() {
             ["notifications", "通知"],
             ["siterules", "站点规则"],
             ["requestheaders", "请求头"],
+            ["traffic", "流量分析"],
             ["advanced", "高级"],
           ] as [TabKey, string][]
         ).map(([key, label]) => (
@@ -283,6 +285,7 @@ export default function OptionsPage() {
         {activeTab === "notifications" && <NotificationsManager isExtension={isExtension} />}
         {activeTab === "siterules" && <SiteRulesManager isExtension={isExtension} />}
         {activeTab === "requestheaders" && <RequestHeadersManager isExtension={isExtension} />}
+        {activeTab === "traffic" && <TrafficAnalysisManager isExtension={isExtension} />}
         {activeTab === "advanced" && (
           <section className="panel-card">
             <h2 className="card-title">高级</h2>
