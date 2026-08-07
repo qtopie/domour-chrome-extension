@@ -128,12 +128,27 @@ Side Panel Chat ──sendMessage──▶ background ──native pipe──▶
 |---|---|---|
 | **General** | Cookie 提取开关、主题 | `allow_cookie_extraction`, `theme` |
 | **Proxy** | 代理 Profile 管理（原 Side Panel `ProxyManager` 组件迁入）：Profile CRUD、切换 active profile、bypass 规则编辑 | `proxy_profiles`, `active_proxy` |
-| **Bridge Setup** (P1) | 安装引导三步（下载→运行→验证），连接状态 + Troubleshooting，**API Token 管理**（查看/复制/重新生成，从 Side Panel 迁出） | `api_token`（读/写 + 触发 RECONNECT） |
+| **Bridge Setup** (P1) | 安装引导（**自动安装**：下载 Cosmos Assistant 桌面应用 → 一键注册 Native Messaging Host；**手动安装**：三步「下载 binary → 运行注册脚本 → 重启浏览器重试」），连接状态 + Troubleshooting，**API Token 管理**（查看/复制/重新生成，从 Side Panel 迁出） | `api_token`（读/写 + 触发 RECONNECT） |
 | **Notifications** | 股票自选源、任务触发条件、提醒方式（badge/声音/系统通知） | `notify_rules` |
 | **Site Rules** | 全局默认 + 按域名白名单/黑名单管理（注入/代理/Cookie 三项独立） | `site_rules` |
 | **Advanced** | MCP 端口、日志级别、数据管理（清日志/清 chat 历史）、重置 | `mcp_port`, `log_level` |
 
-### 4.1 Site Rules 数据模型（三面枢纽）
+### 4.1 Bridge Setup 安装引导（自动 / 手动）
+
+Options → **Bridge Setup** 页签需同时提供两种安装路径（并列展示，`panel-card` 内）：
+
+**A. 自动安装（推荐）**
+- 主 CTA 按钮：「🖥 安装 Cosmos Assistant」→ 新 Tab 打开 `https://qtopie.space/` 下载桌面应用。
+- 说明文字：安装应用后在「Setup 向导」完成 Browser Bridge 配置，即可自动注册 Native Messaging Host。
+
+**B. 手动安装**
+- 次 CTA 按钮：「📦 手动安装」→ 点击后**内联展开**（非跳转）三步：
+  1. 从 GitHub Releases / 官网下载对应平台的 bridge binary（`bin/domour-chrome-bridge`）。
+  2. 终端运行注册脚本 `./register_host.sh <EXTENSION_ID>`（代码块，可一键复制）。
+  3. 重启浏览器后点击「重试连接」（触发 `RECONNECT`）。
+- 注册脚本允许的 extension id 需包含本扩展 ID（Chrome 内 `chrome://extensions` 查看）。
+
+### 4.2 Site Rules 数据模型（三面枢纽）
 
 ```ts
 interface SiteRule {
@@ -151,9 +166,7 @@ interface SiteRules {
 }
 ```
 
-**解析优先级：** `perHost[host]` 命中 → 用其值；未命中 → 取 `global` 默认值。hostname 匹配最长后缀优先（`api.example.com` 匹配 `example.com` 记录）。
-
-**消费方：**
+**解析优先级：** `perHost[host]` 命中 → 用其值；未命中 → 取 `global` 默认值。hostname 匹配最长后缀优先（`api.example.com` 匹配 `example.com` 记录）。**消费方：**
 - Popup：快速切当前站点三开关（写 `perHost[host]`）
 - Options：完整管理（列表、增删、黑白名单分组）
 - Background：`executeAutomationJob` / `runDomScript` 注入前查询 `site_rules`，`bypassProxy` 影响 `applyProxyConfig`，`cookies` 影响 `GET_COOKIES`

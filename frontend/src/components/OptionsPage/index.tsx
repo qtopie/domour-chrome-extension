@@ -18,6 +18,7 @@ export default function OptionsPage() {
   const [isExtension, setIsExtension] = useState<boolean>(false);
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [token, setToken] = useState<string>("");
+  const [manualOpen, setManualOpen] = useState<boolean>(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [copiedToken, setCopiedToken] = useState<boolean>(false);
 
@@ -170,9 +171,78 @@ export default function OptionsPage() {
                 )}
               </button>
             </div>
-            <p className="card-desc">
-              桥接守护进程运行于 localhost:26888，为扩展提供 MCP 服务与原生消息通道。
-            </p>
+
+            <div className="bridge-install">
+              <div className="bridge-install-title">安装 Native Messaging Host</div>
+              <p className="card-desc">
+                桥接守护进程运行于 localhost:26888，为扩展提供 MCP 服务与原生消息通道。请先安装
+                Native Messaging Host，扩展才能启动桥接进程。
+              </p>
+
+              <div className="bridge-install-path">
+                <div className="bridge-install-path-head">
+                  <span className="install-path-badge auto">自动安装</span>
+                  <span className="install-path-name">Cosmos Assistant 桌面应用</span>
+                </div>
+                <p className="card-desc">
+                  下载桌面应用并在「Setup 向导」中完成 Browser Bridge 配置，即可自动注册 Native
+                  Messaging Host。
+                </p>
+                <a
+                  href="https://qtopie.space/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="install-cta-btn primary"
+                >
+                  🖥 前往 qtopie.space 下载
+                </a>
+              </div>
+
+              <div className="bridge-install-path">
+                <div className="bridge-install-path-head">
+                  <span className="install-path-badge manual">手动安装</span>
+                  <span className="install-path-name">下载 binary + 运行注册脚本</span>
+                </div>
+                <p className="card-desc">
+                  下载对应平台的 bridge binary，然后在终端运行注册脚本完成 Native Messaging Host
+                  注册。
+                </p>
+                <button
+                  onClick={() => setManualOpen(!manualOpen)}
+                  className="install-cta-btn secondary"
+                  aria-expanded={manualOpen}
+                >
+                  📦 {manualOpen ? "收起手动安装步骤" : "展开手动安装步骤"}
+                </button>
+                {manualOpen && (
+                  <ol className="manual-steps">
+                    <li>
+                      从 <a href="https://qtopie.space/" target="_blank" rel="noreferrer">qtopie.space</a>{" "}
+                      下载对应平台的 bridge binary（<code className="inline-code">bin/domour-chrome-bridge</code>
+                      ）并解压到本地目录。
+                    </li>
+                    <li>
+                      在终端运行注册脚本（<code className="inline-code">EXTENSION_ID</code> 可在{" "}
+                      <code className="inline-code">chrome://extensions</code> 查看）：
+                      <pre className="install-code">
+                        <code>./register_host.sh &lt;EXTENSION_ID&gt;</code>
+                        <button
+                          onClick={() =>
+                            navigator.clipboard.writeText("./register_host.sh <EXTENSION_ID>")
+                          }
+                          className="copy-btn-text"
+                        >
+                          Copy
+                        </button>
+                      </pre>
+                    </li>
+                    <li>
+                      重启浏览器后点击「重试连接」，若桥接守护进程已启动，状态将变为 ACTIVE。
+                    </li>
+                  </ol>
+                )}
+              </div>
+            </div>
           </section>
         )}
         {activeTab === "notifications" && <NotificationsManager isExtension={isExtension} />}

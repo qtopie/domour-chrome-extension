@@ -100,7 +100,7 @@ export default function PlaywrightManager({ token, isExtension, onLogMessage }: 
         <div className="card-header">
           <h2 className="card-title">Domour Chrome MCP</h2>
           <span className={`status-badge ${isRelayActive ? "active" : ""}`}>
-            <span className={`status-dot ${isRelayActive ? "active" : "offline"}`} />
+            <span className={`status-dot ${isRelayActive ? "active" : "ready"}`} />
             <span className="status-text">{isRelayActive ? "ATTACHED" : "READY"}</span>
           </span>
         </div>
