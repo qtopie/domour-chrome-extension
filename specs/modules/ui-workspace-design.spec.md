@@ -143,10 +143,12 @@ Options → **Bridge Setup** 页签需同时提供两种安装路径（并列展
 
 **B. 手动安装**
 - 次 CTA 按钮：「📦 手动安装」→ 点击后**内联展开**（非跳转）三步：
-  1. 从 GitHub Releases / 官网下载对应平台的 bridge binary（`bin/domour-chrome-bridge`）。
-  2. 终端运行注册脚本 `./register_host.sh <EXTENSION_ID>`（代码块，可一键复制）。
+  1. 从 GitHub Releases 下载对应平台的安装包（含 binary 与 `register_host.sh`）。
+  2. 终端运行注册脚本 `./register_host.sh`（默认使用已发布的生产扩展 ID，无需传参；代码块可一键复制）。
+     - 附带「这个脚本会做什么？」折叠区：说明脚本向浏览器配置目录写入
+       `com.go_react.search_bridge.json`（Native Messaging Host 清单），指向
+       `domour-chrome-bridge` 路径 + 允许的扩展 ID，使 Chrome 能启动守护进程。
   3. 重启浏览器后点击「重试连接」（触发 `RECONNECT`）。
-- 注册脚本允许的 extension id 需包含本扩展 ID（Chrome 内 `chrome://extensions` 查看）。
 
 ### 4.2 Site Rules 数据模型（三面枢纽）
 

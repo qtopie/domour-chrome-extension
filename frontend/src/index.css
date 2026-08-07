@@ -487,6 +487,44 @@ body {
   background: var(--bg-btn-copy-hover);
 }
 
+.install-script-detail-toggle {
+  margin-top: 0.4rem;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--primary);
+  cursor: pointer;
+  font-family: var(--font-sans);
+}
+
+.install-script-detail-toggle:hover {
+  color: #818cf8;
+  text-decoration: underline;
+}
+
+.install-script-detail {
+  margin-top: 0.5rem;
+  background: var(--bg-app);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.script-effect-list {
+  margin: 0.45rem 0 0;
+  padding-left: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
 .svg-icon {
   width: 1.05rem;
   height: 1.05rem;
