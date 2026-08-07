@@ -1,4 +1,5 @@
 import { useState } from "react";
+import TasksPanel from "../TasksPanel";
 
 declare const chrome: any;
 
@@ -6,6 +7,7 @@ interface OverviewPanelProps {
   token: string;
   isConnected: boolean;
   bridgeStatus: string;
+  isExtension: boolean;
   onRegenerateToken: () => void;
   onReconnect: () => void;
 }
@@ -14,6 +16,7 @@ export default function OverviewPanel({
   token,
   isConnected,
   bridgeStatus,
+  isExtension,
   onRegenerateToken,
   onReconnect,
 }: OverviewPanelProps) {
@@ -34,8 +37,7 @@ export default function OverviewPanel({
           <span className={`status-dot ${isConnected ? "active" : "offline"}`} />
         </div>
         <p className="card-desc">
-          在 Chat 中与 AI Agent 对话、下发任务；Tasks 查看执行进度与通知；
-          Logs 调试桥接日志。代理与规则配置请前往扩展设置页。
+          在 Chat 中与 AI Agent 对话、下发任务；Logs 调试桥接日志。通知与任务进度展示如下；代理与规则配置请前往扩展设置页。
         </p>
       </section>
 
@@ -81,6 +83,9 @@ export default function OverviewPanel({
           {" "}{isConnected ? "ACTIVE" : bridgeStatus === "NOT_INSTALLED" ? "桥接未安装" : "OFFLINE"}
         </p>
       </section>
+
+      {/* 通知中心 — merged from Tasks tab */}
+      <TasksPanel isExtension={isExtension} />
     </div>
   );
 }

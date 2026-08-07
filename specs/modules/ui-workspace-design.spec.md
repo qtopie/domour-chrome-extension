@@ -4,7 +4,7 @@
 - **Status:** APPROVED — 2026-08-07
 - **Affected Files:**
   - `frontend/public/manifest.json` — 新增 `options_page`、`default_popup`
-  - `frontend/src/App.tsx` — Side Panel 重构为 5-tab 工作区 + 事件总线订阅
+  - `frontend/src/App.tsx` — Side Panel 重构为 3-tab 工作区 + 事件总线订阅
   - `frontend/src/components/` — 新增 `Popup/`、`OptionsPage/`、`ChatPanel/`、`TasksPanel/`、`OverviewPanel/`、`SiteRules/`
   - `frontend/src/background/index.ts` — 新增消息协议（通知推送、站点规则、Chat 中转）
   - `frontend/src/types/siteRules.ts` — 新增站点权限数据模型
@@ -55,15 +55,14 @@
 
 ---
 
-## 3. Side Panel（工作区，4-Tab）
+## 3. Side Panel（工作区，3-Tab）
 
-`App.tsx` 现有 3 tab 重构为 4 tab。**代理管理不在 Side Panel** —— Proxy Profile 的 CRUD 与切换已由 Options Page 承载（见 §4），Side Panel 聚焦工作流。
+`App.tsx` 现有 3 tab 重构为 3 tab（Overview / Chat / Logs），**Tasks & 通知 合并入 Overview**。**代理管理不在 Side Panel** —— Proxy Profile 的 CRUD 与切换已由 Options Page 承载（见 §4），Side Panel 聚焦工作流。
 
 | Tab | 组件 | 内容 |
 |---|---|---|
-| Overview | `OverviewPanel` | 状态卡片（Bridge/Native）、今日任务摘要、快捷入口 |
-| Chat | `ChatPanel` | 用户 ↔ AI Agent 自然语言对话，流式回复，任务指令下发 |
-| Tasks & 通知 | `TasksPanel` | 任务队列（pending/running/done）、股票行情（bridge 推送）、事件提醒 |
+| Overview（概览） | `OverviewPanel` | 状态卡片（Bridge/Native/Token）、**通知中心**（任务进度、股票行情、事件提醒，即 `TasksPanel`） |
+| Chat | `ChatPanel` + `PlaywrightManager` | 用户 ↔ AI Agent 自然语言对话，流式回复，任务指令下发；`Domour Chrome MCP` 卡片含默认折叠的 MCP Endpoint |
 | Logs | `Bridge & Logs`（现有） | API Token + 实时日志 |
 
 > **注：** 现有 `ProxyManager` 组件从 Side Panel 迁入 Options Page（§4.1），代码复用不删除。
@@ -99,7 +98,9 @@ Side Panel Chat ──sendMessage──▶ background ──native pipe──▶
 - 流式回复以 `AGENT_STREAM` 增量推送，`AGENT_DONE` 结束并持久化到 `chat_history`。
 - **Bridge 为外部 Agent 提供接口**：bridge 暴露可被外部服务调用的工具端点（现有 `/mcp` 即满足），Agent 服务自持 LLM 推理与编排。
 
-### 3.3 Tasks & 通知（bridge 推送）
+### 3.3 通知中心（合并入 Overview）
+
+`TasksPanel` 组件渲染在 Overview tab 底部（不再独立成 tab）。内容：任务队列（pending/running/done）、股票行情（bridge 推送）、事件提醒。
 
 数据源 = **Go bridge 推送**（native messaging），非扩展侧轮询外部 API。
 

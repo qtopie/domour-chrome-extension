@@ -997,6 +997,45 @@ body {
   gap: 0.6rem;
 }
 
+/* MCP Endpoint collapsible toggle (merged into Domour Chrome MCP card) */
+.endpoint-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--border-color);
+  width: 100%;
+  margin-top: 0.9rem;
+  padding: 0.6rem 0.25rem 0.2rem;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: color 0.15s ease;
+}
+
+.endpoint-toggle:hover {
+  color: var(--info);
+}
+
+.endpoint-toggle-arrow {
+  width: 12px;
+  height: 12px;
+  transition: transform 0.2s ease;
+}
+
+.endpoint-toggle-arrow.open {
+  transform: rotate(180deg);
+}
+
+.endpoint-panel {
+  margin-top: 0.6rem;
+  animation: nmh-slide-in 0.2s ease-out;
+}
+
 .relay-client-row {
   display: flex;
   justify-content: space-between;

@@ -3,14 +3,13 @@ import PlaywrightManager from "./components/PlaywrightManager";
 import NmhInstallBanner from "./components/NmhInstallBanner";
 import OverviewPanel from "./components/OverviewPanel";
 import ChatPanel from "./components/ChatPanel";
-import TasksPanel from "./components/TasksPanel";
 import LogsPanel from "./components/LogsPanel";
 import type { LogEntry } from "./components/LogsPanel";
 
 declare const chrome: any;
 
 type BridgeStatus = "CONNECTED" | "DISCONNECTED" | "NOT_INSTALLED";
-type TabKey = "overview" | "chat" | "tasks" | "logs";
+type TabKey = "overview" | "chat" | "logs";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
@@ -210,15 +209,6 @@ export default function App() {
           Chat
         </button>
         <button
-          className={`tab-btn ${activeTab === "tasks" ? "active" : ""}`}
-          onClick={() => setActiveTab("tasks")}
-        >
-          <svg className="tab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-          </svg>
-          Tasks
-        </button>
-        <button
           className={`tab-btn ${activeTab === "logs" ? "active" : ""}`}
           onClick={() => setActiveTab("logs")}
         >
@@ -236,6 +226,7 @@ export default function App() {
             token={token}
             isConnected={isConnected}
             bridgeStatus={bridgeStatus}
+            isExtension={isExtension}
             onRegenerateToken={regenerateToken}
             onReconnect={triggerReconnect}
           />
@@ -246,7 +237,6 @@ export default function App() {
             <PlaywrightManager token={token} isExtension={isExtension} onLogMessage={appendSystemLog} />
           </>
         )}
-        {activeTab === "tasks" && <TasksPanel isExtension={isExtension} />}
         {activeTab === "logs" && (
           <LogsPanel logs={logs} onClearLogs={clearLogs} />
         )}
