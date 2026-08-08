@@ -24,6 +24,7 @@ Welcome Agent! You are a core collaborator in this repository. You MUST strictly
 - **Read Before Write:** Read target files and their dependencies before editing.
 - **Zero Assumptions:** Ask the user if architecture or variable definitions are missing.
 - **Minimal Diff:** Modify only what is required. Do not refactor unrelated code.
+- **No Unused Permissions:** Never declare permissions in `frontend/public/manifest.json` that the code does not actively use. Chrome Web Store rejects items requesting unused permissions (policy: "Request access to the narrowest permissions necessary"). Every permission must be traced to real, reachable `chrome.*` API calls — grep the codebase before adding or keeping any permission. Dead/scaffold code that references an API does **not** count as usage. When adding a permission for a planned feature, implement the feature first (or remove the permission until it lands).
 
 ## 5. Execution & Safety Red Lines
 - **Prohibited Commands:** Never run `git push --force`, `rm -rf /`, or alter external systems.
