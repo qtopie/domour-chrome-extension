@@ -109,6 +109,7 @@ export default function OptionsPage() {
               </linearGradient>
             </defs>
           </svg>
+          <span className="logo-text">Domour Copilot Extension</span>
         </div>
         <div className="status-badge">
           <span className={`status-dot ${isConnected ? "active" : "offline"}`} />
