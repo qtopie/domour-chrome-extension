@@ -110,6 +110,7 @@ export const en: Dict = {
   "popup.add": "+ Add",
   "popup.sync": "Synced",
   "popup.save": "Save",
+  "popup.openPanel": "Open Side Panel",
 
   // ---------- Notifications ----------
   "notifications.title": "Notification Settings",

@@ -110,6 +110,7 @@ export const zh: Dict = {
   "popup.add": "+ 添加",
   "popup.sync": "已同步",
   "popup.save": "保存",
+  "popup.openPanel": "打开侧边栏",
 
   // ---------- Notifications ----------
   "notifications.title": "通知设置",

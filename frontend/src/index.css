@@ -1854,6 +1854,11 @@ body {
   padding-top: 0.6rem;
   text-align: center;
 }
+.popup-footer-btns {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+}
 .popup-options-btn {
   background: none;
   border: 1px solid rgba(255, 255, 255, 0.15);

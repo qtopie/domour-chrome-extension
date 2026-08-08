@@ -153,6 +153,16 @@ export default function PopupApp() {
     });
   };
 
+  const openSidePanel = () => {
+    if (typeof chrome === "undefined" || !chrome.sidePanel) return;
+    chrome.windows?.getCurrent((win: any) => {
+      chrome.sidePanel.open({ windowId: win?.id }, () => {
+        if (chrome.runtime?.lastError) console.warn(chrome.runtime.lastError);
+        window.close();
+      });
+    });
+  };
+
   return (
     <div className="popup-container">
       <header className="popup-header">
@@ -243,12 +253,20 @@ export default function PopupApp() {
       </section>
 
       <footer className="popup-footer">
-        <button
-          onClick={() => chrome.runtime?.openOptionsPage?.()}
-          className="popup-options-btn"
-        >
-          {t("common.openSettings")}
-        </button>
+        <div className="popup-footer-btns">
+          <button
+            onClick={() => openSidePanel()}
+            className="popup-options-btn"
+          >
+            {t("popup.openPanel")}
+          </button>
+          <button
+            onClick={() => chrome.runtime?.openOptionsPage?.()}
+            className="popup-options-btn"
+          >
+            {t("common.openSettings")}
+          </button>
+        </div>
       </footer>
     </div>
   );
