@@ -345,7 +345,8 @@ export function executeAutomationJob(
     const expr = job.expression || "";
     runDomScript((code: string) => {
       try {
-        const result = eval(code);
+        const fn = new Function('"use strict"; return (' + code + ')');
+        const result = fn();
         return { success: true, result: String(result) };
       } catch (err) {
         return { success: false, error: String(err) };

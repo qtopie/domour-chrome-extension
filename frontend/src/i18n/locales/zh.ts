@@ -36,6 +36,7 @@ export const zh: Dict = {
   "options.general.title": "通用",
   "options.general.desc": "代理配置已迁移至「代理」标签页；任务对话与日志请使用侧边面板工作区。",
   "options.language.title": "语言 / Language",
+  "options.language.desc": "选择扩展界面显示的语言（支持跟随浏览器系统语言或手动指定）",
   "options.language.auto": "跟随系统 (Auto)",
   "options.language.zh": "简体中文",
   "options.language.en": "English",

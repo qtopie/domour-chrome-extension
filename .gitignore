@@ -26,12 +26,14 @@ frontend/out/
 # Temporary outputs, logs, & debug artifacts
 *.log
 *.png
+*.jpg
 *.zip
+release/
 bridge.log
 cdp_nosandbox.log
 chrome_cdp.log
 test_cdp.log
-screenshot*.png
+screenshot*
 domour-chrome-extension.zip
 
 # Temporary test scripts

@@ -36,6 +36,7 @@ export const en: Dict = {
   "options.general.title": "General",
   "options.general.desc": "Proxy settings have moved to the Proxy tab; use the side panel workspace for task chat and logs.",
   "options.language.title": "语言 / Language",
+  "options.language.desc": "Choose the display language for the extension UI (system default or manual override)",
   "options.language.auto": "跟随系统 (Auto)",
   "options.language.zh": "简体中文",
   "options.language.en": "English",

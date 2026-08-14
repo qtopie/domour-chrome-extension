@@ -134,19 +134,37 @@ export default function OptionsPage() {
           <>
             <section className="panel-card">
               <h2 className="card-title">{t("options.general.title")}</h2>
-              <p className="card-desc">{t("options.general.desc")}</p>
-              <label className="lang-select-row">
-                <span className="lang-select-label">{t("options.language.title")}</span>
-                <select
-                  className="lang-select"
-                  value={override}
-                  onChange={(e) => setLang(e.target.value as "auto" | "zh-CN" | "en")}
-                >
-                  <option value="auto">{t("options.language.auto")}</option>
-                  <option value="zh-CN">{t("options.language.zh")}</option>
-                  <option value="en">{t("options.language.en")}</option>
-                </select>
-              </label>
+              
+              <div className="fluent-setting-item">
+                <div className="fluent-setting-info">
+                  <div className="fluent-setting-icon">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"/>
+                      <line x1="2" y1="12" x2="22" y2="12"/>
+                      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"/>
+                    </svg>
+                  </div>
+                  <div className="fluent-setting-text">
+                    <span className="fluent-setting-title">{t("options.language.title")}</span>
+                    <span className="fluent-setting-desc">{t("options.language.desc")}</span>
+                  </div>
+                </div>
+                <div className="fluent-select-wrapper">
+                  <select
+                    className="fluent-select"
+                    value={override}
+                    onChange={(e) => setLang(e.target.value as "auto" | "zh-CN" | "en")}
+                    aria-label={t("options.language.title")}
+                  >
+                    <option value="auto">{t("options.language.auto")}</option>
+                    <option value="zh-CN">{t("options.language.zh")}</option>
+                    <option value="en">{t("options.language.en")}</option>
+                  </select>
+                  <svg className="fluent-select-arrow" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </div>
+              </div>
             </section>
             <BridgeConfig
               token={token}

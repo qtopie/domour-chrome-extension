@@ -57,6 +57,19 @@ function broadcastRequestHeaders(config: RequestHeadersConfig): void {
   chrome.runtime.sendMessage({ type: "REQUEST_HEADERS_UPDATED", config }).catch(() => {});
 }
 
+let dnrSyncTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Schedule DNR rules sync with debouncing to prevent excessive updates. */
+function scheduleDnrSync(config: RequestHeadersConfig, delayMs: number = 200): void {
+  if (dnrSyncTimer) {
+    clearTimeout(dnrSyncTimer);
+  }
+  dnrSyncTimer = setTimeout(() => {
+    dnrSyncTimer = null;
+    syncDnrRules(config);
+  }, delayMs);
+}
+
 /** Apply the config to declarativeNetRequest dynamic rules. */
 function syncDnrRules(config: RequestHeadersConfig): void {
   if (typeof chrome === "undefined" || !chrome.declarativeNetRequest) {
@@ -98,7 +111,11 @@ function validateHeaders(headers: unknown): HeaderKV[] | null {
 }
 
 let nativePort: chrome.runtime.Port | null = null;
-let reconnectTimer: any = null;
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let reconnectAttempts = 0;
+const INITIAL_RECONNECT_DELAY_MS = 1000;
+const MAX_RECONNECT_DELAY_MS = 30000;
+const MAX_RECONNECT_ATTEMPTS = 10;
 let lastDisconnectReason: BridgeDisconnectReason = "DISCONNECTED";
 
 function connectToNative(): void {
@@ -134,10 +151,25 @@ function connectToNative(): void {
         if (reconnectTimer) clearTimeout(reconnectTimer);
         // Only auto-reconnect if it was a crash/disconnect, not a missing host
         if (reason === "DISCONNECTED") {
-          reconnectTimer = setTimeout(() => {
-            appendLog("system", "Attempting to reconnect to Native Bridge...");
-            connectToNative();
-          }, 5000);
+          if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+            const delay = Math.min(
+              INITIAL_RECONNECT_DELAY_MS * Math.pow(2, reconnectAttempts),
+              MAX_RECONNECT_DELAY_MS
+            );
+            reconnectAttempts++;
+            appendLog(
+              "system",
+              `Scheduling native bridge reconnect attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} in ${delay}ms...`
+            );
+            reconnectTimer = setTimeout(() => {
+              connectToNative();
+            }, delay);
+          } else {
+            appendLog(
+              "warn",
+              `Max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached. Pausing auto-reconnect.`
+            );
+          }
         }
       });
 
@@ -146,6 +178,7 @@ function connectToNative(): void {
         type: "INITIAL_AUTH",
         token: token
       });
+      reconnectAttempts = 0; // Reset backoff upon successful connection
       notifyPanelStatus(true);
 
     } catch (e: any) {
@@ -529,7 +562,7 @@ function handleRuntimeMessage(message: any, sendResponse: (response: any) => voi
         _meta: { updatedAt: Date.now() }
       };
       chrome.storage.local.set({ request_headers: next }, () => {
-        syncDnrRules(next);
+        scheduleDnrSync(next);
         broadcastRequestHeaders(next);
         appendLog("info", `Request header config saved (${globalHeaders.length} global, ${Object.keys(perHost).length} hosts).`);
         sendResponse({ success: true, config: next });
@@ -543,7 +576,7 @@ function handleRuntimeMessage(message: any, sendResponse: (response: any) => voi
     getRequestHeaders((config) => {
       const next = toggleGlobalHeaderRule(config, enabled);
       chrome.storage.local.set({ request_headers: next }, () => {
-        syncDnrRules(next);
+        scheduleDnrSync(next);
         broadcastRequestHeaders(next);
         appendLog("info", `Request header global toggle: ${enabled ? "ON" : "OFF"}.`);
         sendResponse({ success: true, enabled, config: next });
@@ -562,7 +595,7 @@ function handleRuntimeMessage(message: any, sendResponse: (response: any) => voi
     getRequestHeaders((config) => {
       const next = setHeaderRule(config, host, headers, true);
       chrome.storage.local.set({ request_headers: next }, () => {
-        syncDnrRules(next);
+        scheduleDnrSync(next);
         broadcastRequestHeaders(next);
         appendLog("info", `Request header rule set for ${host} (${headers.length} headers).`);
         sendResponse({ success: true, config: next });
@@ -580,7 +613,7 @@ function handleRuntimeMessage(message: any, sendResponse: (response: any) => voi
     getRequestHeaders((config) => {
       const next = removeHeaderRule(config, host);
       chrome.storage.local.set({ request_headers: next }, () => {
-        syncDnrRules(next);
+        scheduleDnrSync(next);
         broadcastRequestHeaders(next);
         appendLog("info", `Request header rule removed for ${host}.`);
         sendResponse({ success: true, config: next });

@@ -1,6 +1,6 @@
 # Chrome Web Store Listing — Domour Copilot
 
-> Last Updated: 2026-07-28
+> Last Updated: 2026-08-14 | Version: 1.3.0
 
 ## Store Listing
 
@@ -17,7 +17,8 @@ Key Features:
 - Native Automation Engine: Execute silent web navigation, text extraction, and page scraping using your authentic browser context without CDP/debugging ports.
 - Native MCP Server Integration: Built-in Stdio and Streamable HTTP (Port 26888) MCP servers for AI agents (Cursor, Claude, Antigravity).
 - Low-Token Vision Screenshots: Native image/png MCP response node for LLM vision models, saving up to 99% of context window tokens.
-- Dynamic PAC Proxy Management: Auto-syncs with local vproxy configurations, supporting SOCKS5 failovers, domain routing, and automatic LAN bypass.
+- Dynamic PAC Proxy & Header Injection: Auto-syncs with local vproxy configurations, supports SOCKS5 failovers, domain routing, and declarative custom request header overrides.
+- Multi-Language & Fluent UI: Seamless English and Simplified Chinese support with accessible Fluent UI design.
 - Privacy-First Protection: One-click UI toggle to control sensitive cookie extraction permissions.
 
 How to Use:
@@ -40,9 +41,8 @@ English
 
 | Asset | Dimensions | Status | Filename |
 |-------|-----------|--------|----------|
-| Store Icon [REQUIRED] | 128×128 PNG | ✅ Ready | `frontend/public/favicon.svg` |
-| Screenshot 1 [REQUIRED] | 1280×800 | 🟡 Needs capture | |
-| Small Promo Tile [RECOMMENDED] | 440×280 | ⬜ Not created | |
+| Store Icon [REQUIRED] | 128×128 PNG | ✅ Ready | `frontend/public/icon-128.png` |
+| Screenshot 1 [REQUIRED] | 1280×800 | ✅ Ready | `screenshot_1280x800.png` |
 
 ---
 
@@ -54,8 +54,9 @@ English
 | `cookies` | permissions | Required to extract session cookies for authenticated web automation when explicitly enabled by user. |
 | `sidePanel` | permissions | Required to render the React UI side panel for token management and execution logging. |
 | `scripting` | permissions | Required to inject web scraping scripts to extract title and text content on automated tabs. |
-| `storage` | permissions | Required to persist user proxy profiles, API tokens, and privacy toggle settings locally. |
+| `storage` | permissions | Required to persist user proxy profiles, API tokens, language preferences, and privacy toggle settings locally. |
 | `proxy` | permissions | Required to apply dynamic PAC proxy routing and LAN bypass rules to Chromium settings. |
+| `declarativeNetRequest` | permissions | Required to inject custom request headers for specified target domains without intercepting response payloads. |
 
 ---
 
@@ -73,7 +74,8 @@ English
 
 ## Pre-Publish Artifact Checklist
 
-- [x] Extension compiled into ZIP: `domour-chrome-extension.zip`
-- [x] Manifest Version 3 verified
+- [x] Extension compiled into ZIP: `release/domour-copilot-extension-v1.3.0.zip`
+- [x] Manifest Version 3 verified (`1.3.0`)
 - [x] All permissions justified in plain English
 - [x] Single purpose declared clearly
+- [x] Pass all automated harness & lint checks (`./scripts/check.sh`)

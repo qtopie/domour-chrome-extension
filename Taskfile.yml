@@ -46,6 +46,22 @@ tasks:
     cmds:
       - npm run dev
 
+  package:extension:
+    desc: Package the built frontend into a production release ZIP ready for Chrome/Edge Store
+    deps: [frontend:build]
+    cmds:
+      - mkdir -p release
+      - cd frontend/dist && zip -FS -r ../../release/domour-copilot-extension-v$(node -p "require('./manifest.json').version").zip ./*
+      - cp release/domour-copilot-extension-v$(node -p "require('./frontend/public/manifest.json').version").zip release/domour-copilot-extension-latest.zip 2>/dev/null || true
+
+  release:
+    desc: Run full check, build binaries and package extension ZIP for release
+    cmds:
+      - ./scripts/check.sh
+      - task: backend:build
+      - task: package:extension
+      - echo "✅ Release package built successfully in release/"
+
   register:
     desc: "Register the Native Messaging Host configuration with Microsoft Edge (Usage: task register -- <EXTENSION_ID>)"
     cmds:
