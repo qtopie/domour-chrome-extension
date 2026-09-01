@@ -52,7 +52,7 @@ export const en: Dict = {
   "bridge.autoBadge": "Auto install",
   "bridge.autoName": "Extension + Cosmos Assistant desktop app",
   "bridge.autoDesc": "This extension is published on the Chrome Web Store (extension ID {extId}). Download the desktop app and complete the Browser Bridge setup in the Setup Wizard to auto-register the Native Messaging Host.",
-  "bridge.autoCta": "🖥 Go to qtopie.space to download",
+  "bridge.autoCta": "🖥 Go to domour.space to download",
   "bridge.manualBadge": "Manual install",
   "bridge.manualName": "Download binary from GitHub Releases + register script",
   "bridge.manualDesc": "Download the platform-specific bridge binary from GitHub Releases, then run the register script in the terminal to complete Native Messaging Host registration.",

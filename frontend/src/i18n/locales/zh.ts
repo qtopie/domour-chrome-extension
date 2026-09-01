@@ -52,7 +52,7 @@ export const zh: Dict = {
   "bridge.autoBadge": "自动安装",
   "bridge.autoName": "扩展 + Cosmos Assistant 桌面应用",
   "bridge.autoDesc": "本扩展已发布至 Chrome Web Store（扩展 ID {extId}）。下载桌面应用并在「Setup 向导」中完成 Browser Bridge 配置，即可自动注册 Native Messaging Host。",
-  "bridge.autoCta": "🖥 前往 qtopie.space 下载",
+  "bridge.autoCta": "🖥 前往 domour.space 下载",
   "bridge.manualBadge": "手动安装",
   "bridge.manualName": "GitHub Releases 下载 binary + 注册脚本",
   "bridge.manualDesc": "从 GitHub Releases 下载对应平台的 bridge binary，然后在终端运行注册脚本完成 Native Messaging Host 注册。",

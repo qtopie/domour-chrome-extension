@@ -144,7 +144,7 @@ Side Panel Chat ──sendMessage──▶ background ──native pipe──▶
 Options → **Bridge Setup** 页签需同时提供两种安装路径（并列展示，`panel-card` 内）：
 
 **A. 自动安装（推荐）**
-- 主 CTA 按钮：「🖥 安装 Cosmos Assistant」→ 新 Tab 打开 `https://qtopie.space/` 下载桌面应用。
+- 主 CTA 按钮：「🖥 安装 Cosmos Assistant」→ 新 Tab 打开 `https://domour.space/` 下载桌面应用。
 - 说明文字：安装应用后在「Setup 向导」完成 Browser Bridge 配置，即可自动注册 Native Messaging Host。
 
 **B. 手动安装**

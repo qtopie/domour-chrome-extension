@@ -12,7 +12,7 @@ interface BridgeConfigProps {
 }
 
 /**
- * 桥接配置卡片：展示 API Token、自动安装（Chrome Web Store + qtopie.space 桌面应用）
+ * 桥接配置卡片：展示 API Token、自动安装（Chrome Web Store + domour.space 桌面应用）
  * 与手动安装（GitHub Releases binary + register_host.sh）指引。
  * 原为「桥接」独立 tab，现并入「通用」tab。
  */
@@ -70,7 +70,7 @@ export default function BridgeConfig({
             {t("bridge.autoDesc", { extId: "ndbhggifgbebojmidnoenkfpiiknkggc" })}
           </p>
           <a
-            href="https://qtopie.space/"
+            href="https://domour.space/"
             target="_blank"
             rel="noreferrer"
             className="install-cta-btn primary"
