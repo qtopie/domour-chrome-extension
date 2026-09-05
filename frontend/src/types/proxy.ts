@@ -23,7 +23,8 @@ export const DEFAULT_LAN_BYPASS = [
   "172.16.0.0/12",
   "169.254.0.0/16",
   "*.local",
-  "*.lan"
+  "*.lan",
+  "*.home.arpa"
 ];
 
 export interface ProxyProfile {

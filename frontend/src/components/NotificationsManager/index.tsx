@@ -45,10 +45,7 @@ export default function NotificationsManager({ isExtension }: NotificationsManag
   const clearEvents = () => {
     setEvents([]);
     if (isExtension && typeof chrome !== "undefined") {
-      chrome.storage.local.set({ events: [] });
-      try {
-        chrome.action?.setBadgeText({ text: "" });
-      } catch { /* not in action context */ }
+      sendMessage({ type: "CLEAR_EVENTS" });
     }
   };
 

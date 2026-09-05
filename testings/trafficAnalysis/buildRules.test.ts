@@ -186,6 +186,8 @@ console.log("TestTA_DevDomainHint (SPEC-TA-008)");
   check("localhost detected", isLocalDevPattern("localhost"));
   check("*.local detected", isLocalDevPattern("myapp.local"));
   check("*.lan detected", isLocalDevPattern("router.lan"));
+  check("*.home.arpa detected", isLocalDevPattern("device.home.arpa"));
+  check("home.arpa detected", isLocalDevPattern("home.arpa"));
   check("127.x detected", isLocalDevPattern("127.0.0.1"));
   check("192.168.x detected", isLocalDevPattern("192.168.1.10"));
   check("10.x detected", isLocalDevPattern("10.0.0.5"));

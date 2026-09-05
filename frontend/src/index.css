@@ -1952,6 +1952,14 @@ body:has(.options-container) {
 .popup-profile input[type="radio"] {
   accent-color: #00f2fe;
 }
+.popup-profile-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.4);
+}
 .popup-toggles {
   display: flex;
   flex-direction: column;

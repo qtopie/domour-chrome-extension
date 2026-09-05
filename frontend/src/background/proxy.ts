@@ -1,6 +1,7 @@
 import type { ProxyProfile } from './types';
 import { appendLog } from './logger';
 import { DEFAULT_LAN_BYPASS } from '../types/proxy';
+import { updateToolbarIconForProfile } from './proxyIcon';
 
 export { DEFAULT_LAN_BYPASS };
 
@@ -15,7 +16,7 @@ const PAC_LAN_BYPASS_WRAPPER = `
 var __domourIsLocalHost = function(host) {
   if (!host) return true;
   host = String(host).toLowerCase().replace(/^\\[|\\]$/g, '');
-  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')) return true;
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.lan') || host === 'home.arpa' || host.endsWith('.home.arpa')) return true;
   if (host.indexOf(':') >= 0) {
     if (host === '::1' || host === '::') return true;
     if (host.indexOf('fe80:') === 0) return true;
@@ -112,6 +113,7 @@ export function applyProxyConfig(profile: ProxyProfile | null): Promise<void> {
         } else {
           const desc = profile ? `${profile.name} [${profile.mode}${profile.scheme ? ' (' + profile.scheme + ')' : ''}]` : "Direct";
           appendLog("system", `Proxy rule successfully applied: ${desc}`);
+          updateToolbarIconForProfile(profile).catch(() => {});
           resolve();
         }
       });

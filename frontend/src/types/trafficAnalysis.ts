@@ -196,7 +196,7 @@ export function resolveRulesForHost(
 export function isLocalDevPattern(pattern: string): boolean {
   const p = pattern.trim().toLowerCase();
   if (p.startsWith("localhost") || p.endsWith(".localhost")) return true;
-  if (p.endsWith(".local") || p.endsWith(".lan")) return true;
+  if (p.endsWith(".local") || p.endsWith(".lan") || p.endsWith(".home.arpa") || p === "home.arpa") return true;
   if (/^(127\.|10\.|192\.168\.)/.test(p)) return true;
   if (/^172\.(1[6-9]|2[0-9]|3[01])\./.test(p)) return true;
   return false;

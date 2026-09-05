@@ -382,7 +382,7 @@ var FindProxyForURL = function(init, profiles) {
     "+auto switch": function(url, host, scheme) {
         "use strict";
         // LAN & Localhost Bypass Rules (Never use proxy for intranet)
-        if (!host || isPlainHostName(host) || host === '127.0.0.1' || host === 'localhost' || host === '::1' || /(?:^|\.)local$/.test(host)) return "DIRECT";
+        if (!host || isPlainHostName(host) || host === '127.0.0.1' || host === 'localhost' || host === '::1' || /(?:^|\.)(?:local|lan|home\.arpa)$/.test(host)) return "DIRECT";
         if (/^(?:10|127|192\.168|172\.(?:1[6-9]|2[0-9]|3[01]))\./.test(host)) return "DIRECT";
 
 %s

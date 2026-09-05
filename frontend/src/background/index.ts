@@ -32,6 +32,7 @@ import {
 import { validateTrafficConfig } from '../types/trafficAnalysis';
 import type { TrafficAnalysisConfig } from '../types/trafficAnalysis';
 import { runRequestTest } from '../types/requestTest';
+import { restoreProfileBadge } from './proxyIcon';
 
 function getSiteRules(callback: (rules: SiteRules) => void): void {
   chrome.storage.local.get(["site_rules"], (res) => {
@@ -767,11 +768,19 @@ function handleRuntimeMessage(message: any, sendResponse: (response: any) => voi
     return true;
   }
 
+  if (message.type === "CLEAR_EVENTS") {
+    chrome.storage.local.set({ events: [] }, () => {
+      restoreProfileBadge();
+      sendResponse({ success: true });
+    });
+    return true;
+  }
+
   if (message.type === "NOTIFY_TOGGLE") {
     const enabled = message.enabled !== false;
     chrome.storage.local.set({ notify_enabled: enabled }, () => {
       if (!enabled) {
-        chrome.action.setBadgeText({ text: "" });
+        restoreProfileBadge();
       }
       sendResponse({ success: true, enabled });
     });

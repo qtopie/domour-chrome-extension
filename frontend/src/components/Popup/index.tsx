@@ -4,6 +4,7 @@ import { resolveSiteRule, hostFromUrl } from "../../types/siteRules";
 import { matchPerHost } from "../../types/requestHeaders";
 import type { HeaderKV } from "../../types/requestHeaders";
 import { useI18n } from "../../i18n/I18nProvider";
+import { resolveProfileColor } from "../../types/proxyIcon";
 
 declare const chrome: any;
 
@@ -173,17 +174,24 @@ export default function PopupApp() {
 
       <section className="popup-section">
         <h3 className="popup-section-title">{t("popup.proxyProfile")}</h3>
-        {profiles.map((p) => (
-          <label key={p.id} className={`popup-profile ${activeProfileId === p.id ? "selected" : ""}`}>
-            <input
-              type="radio"
-              name="proxy-profile"
-              checked={activeProfileId === p.id}
-              onChange={() => switchProfile(p.id)}
-            />
-            <span>{p.name}</span>
-          </label>
-        ))}
+        {profiles.map((p) => {
+          const profileColor = resolveProfileColor(p as any);
+          return (
+            <label key={p.id} className={`popup-profile ${activeProfileId === p.id ? "selected" : ""}`}>
+              <input
+                type="radio"
+                name="proxy-profile"
+                checked={activeProfileId === p.id}
+                onChange={() => switchProfile(p.id)}
+              />
+              <span
+                className="popup-profile-dot"
+                style={{ backgroundColor: profileColor }}
+              />
+              <span>{p.name}</span>
+            </label>
+          );
+        })}
       </section>
 
       <section className="popup-section">
