@@ -50,3 +50,8 @@ This module introduces concurrent active probing (health check) with latency mea
 - **Given** The user requests PAC generation or default proxy rules
 - **When** Evaluating default proxied domains
 - **Then** The PAC includes standard proxy domain patterns for Google ecosystem (`*.google.com`, `*.google`, `*.google.dev`, `*.google.com.hk`, `*.gstatic.com`, `*.googleapis.com`, `*.googleusercontent.com`, `*.youtube.com`, `*.youtu.be`, `*.ytimg.com`, `*.googlevideo.com`), developer services (`*.github.com`, `*.githubusercontent.com`, `*.golang.org`), and knowledge/productivity sites (`*.wikipedia.org`, `*.live.com`).
+
+### SPEC-UP-006: CIDR and Slash Escaping in PAC Generation
+- **Given** `cfg.Rules` in vproxy config contains CIDR notations such as `127.0.0.0/8,DIRECT` or `192.168.0.0/16,DIRECT`
+- **When** Generating PAC regex rules for domain and IP matching
+- **Then** Slashes `/` in CIDRs must be converted into valid IP/isInNet PAC checks or correctly escaped in regular expressions (`\/`) without producing invalid regex flag syntax errors in JavaScript.

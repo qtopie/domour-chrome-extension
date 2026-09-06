@@ -13,3 +13,5 @@ Mapping between `specs/modules/upstream-probing.spec.md` scenarios and implement
   - Test / Verification: `main_test.go::TestAllUpstreamsUnreachableFallback` verifies non-empty proxy list fallback when all probes fail.
 - `SPEC-UP-005`: Built-in Default Proxy Domain List
   - Test / Verification: `main_test.go::TestDefaultProxyDomains` verifies that standard Google, GitHub, Wikipedia, Golang, etc. domains are incorporated into default proxied list.
+- `SPEC-UP-006`: CIDR and Slash Escaping in PAC Generation
+  - Test / Verification: `main_test.go::TestRuleEscapingAndCIDR` verifies that CIDR rules and domain rules generate syntactically valid JavaScript regexes and evaluations.

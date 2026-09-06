@@ -472,11 +472,15 @@ func startEmbeddedMCPServer(port int) {
 		// Escape domain strings for regex
 		var directRegexes, proxyRegexes []string
 		for _, d := range directDomains {
-			escapedDomain := strings.ReplaceAll(d, ".", "\\.")
+			escapedDomain := strings.ReplaceAll(d, "\\", "\\\\")
+			escapedDomain = strings.ReplaceAll(escapedDomain, ".", "\\.")
+			escapedDomain = strings.ReplaceAll(escapedDomain, "/", "\\/")
 			directRegexes = append(directRegexes, fmt.Sprintf("        if (/(?:^|\\.)%s$/.test(host)) return \"DIRECT\";", escapedDomain))
 		}
 		for _, d := range proxyDomains {
-			escapedDomain := strings.ReplaceAll(d, ".", "\\.")
+			escapedDomain := strings.ReplaceAll(d, "\\", "\\\\")
+			escapedDomain = strings.ReplaceAll(escapedDomain, ".", "\\.")
+			escapedDomain = strings.ReplaceAll(escapedDomain, "/", "\\/")
 			proxyRegexes = append(proxyRegexes, fmt.Sprintf("        if (/(?:^|\\.)%s$/.test(host)) return \"+proxy\";", escapedDomain))
 		}
 

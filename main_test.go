@@ -120,3 +120,16 @@ func TestDefaultProxyDomains(t *testing.T) {
 		}
 	}
 }
+
+func TestRuleEscapingAndCIDR(t *testing.T) {
+	rulesWithCIDR := []string{"127.0.0.0/8", "192.168.0.0/16", "10.0.0.0/8"}
+	for _, r := range rulesWithCIDR {
+		escaped := strings.ReplaceAll(r, "\\", "\\\\")
+		escaped = strings.ReplaceAll(escaped, ".", "\\.")
+		escaped = strings.ReplaceAll(escaped, "/", "\\/")
+		jsRegex := fmt.Sprintf("/(?:^|\\.)%s$/", escaped)
+		if !strings.Contains(jsRegex, "\\/") {
+			t.Fatalf("expected escaped slash in %s, got %s", r, jsRegex)
+		}
+	}
+}
