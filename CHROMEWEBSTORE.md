@@ -1,6 +1,15 @@
 # Chrome Web Store Listing — Domour Copilot
 
-> Last Updated: 2026-08-14 | Version: 1.3.0
+> Last Updated: 2026-09-06 | Version: 1.3.1
+
+## Version History
+
+### 1.3.1 (2026-09-06)
+- Fix cross-world extension resource mismatch by disabling Vite modulePreload in HTML builds.
+- Dynamic Toolbar Icon: Real-time visual feedback reflecting active proxy status in Go Gopher blue (#00ADD8).
+- Clean Toolbar UX: Removed cluttered badge abbreviation text from toolbar icon.
+- Contrast Optimization: Seamless white inner ring for optimal clarity in both dark and light browser themes.
+- Updated tabs and activeTab permission justifications.
 
 ## Store Listing
 
@@ -54,9 +63,15 @@ English
 | `cookies` | permissions | Required to extract session cookies for authenticated web automation when explicitly enabled by user. |
 | `sidePanel` | permissions | Required to render the React UI side panel for token management and execution logging. |
 | `scripting` | permissions | Required to inject web scraping scripts to extract title and text content on automated tabs. |
+| `tabs` | permissions | Required to query current active tab URL to resolve host-specific proxy rules and request header injection configs. |
+| `activeTab` | permissions | Required to access the current tab context upon user action click for immediate automation and status updates. |
 | `storage` | permissions | Required to persist user proxy profiles, API tokens, language preferences, and privacy toggle settings locally. |
 | `proxy` | permissions | Required to apply dynamic PAC proxy routing and LAN bypass rules to Chromium settings. |
 | `declarativeNetRequest` | permissions | Required to inject custom request headers for specified target domains without intercepting response payloads. |
+
+| Host Permission | Type | Justification |
+|-----------------|------|---------------|
+| `<all_urls>` | host_permissions | Required to enable user-defined proxy routing, declarative header rules, and automation across user-requested domains. |
 
 ---
 
@@ -74,8 +89,8 @@ English
 
 ## Pre-Publish Artifact Checklist
 
-- [x] Extension compiled into ZIP: `release/domour-copilot-extension-v1.3.0.zip`
-- [x] Manifest Version 3 verified (`1.3.0`)
+- [x] Extension compiled into ZIP: `release/domour-copilot-extension-v1.3.1.zip`
+- [x] Manifest Version 3 verified (`1.3.1`)
 - [x] All permissions justified in plain English
 - [x] Single purpose declared clearly
 - [x] Pass all automated harness & lint checks (`./scripts/check.sh`)

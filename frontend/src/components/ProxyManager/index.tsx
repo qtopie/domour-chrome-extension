@@ -10,8 +10,8 @@ interface ProxyManagerProps {
   onLogMessage?: (level: string, message: string) => void;
 }
 
-const DEFAULT_COLOR = "#3b82f6";
-const PRESET_COLORS = ["#10b981", "#3b82f6", "#8b5cf6", "#ec4899", "#f59e0b", "#6366f1"];
+const DEFAULT_COLOR = "#00add8";
+const PRESET_COLORS = ["#00add8", "#34d399", "#818cf8", "#a78bfa", "#f472b6", "#fbbf24"];
 
 export default function ProxyManager({ isExtension, onLogMessage }: ProxyManagerProps) {
   const [profiles, setProfiles] = useState<ProxyProfile[]>([]);
@@ -33,15 +33,15 @@ export default function ProxyManager({ isExtension, onLogMessage }: ProxyManager
     } else {
       // Mock profiles for web dev mode
       const mockProfiles: ProxyProfile[] = [
-        { id: "direct", name: "Direct Connection", mode: "direct", color: "#10b981" },
-        { id: "system", name: "System Default Proxy", mode: "system", color: "#6366f1" },
+        { id: "direct", name: "Direct Connection", mode: "direct", color: "#34d399" },
+        { id: "system", name: "System Default Proxy", mode: "system", color: "#818cf8" },
         {
           id: "vproxy_auto_pac",
           name: "vproxy AutoProxy PAC",
           mode: "pac_script",
           pacType: "url",
           pacUrl: "http://127.0.0.1:26888/proxy.pac",
-          color: "#8b5cf6",
+          color: "#00add8",
           isVproxy: true
         },
         {
@@ -52,7 +52,7 @@ export default function ProxyManager({ isExtension, onLogMessage }: ProxyManager
           host: "127.0.0.1",
           port: 1080,
           bypassList: [...DEFAULT_LAN_BYPASS],
-          color: "#3b82f6"
+          color: "#00add8"
         }
       ];
       setProfiles(mockProfiles);

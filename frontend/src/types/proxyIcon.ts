@@ -1,8 +1,8 @@
 import type { ProxyProfile } from "./proxy";
 
-export const DEFAULT_PROFILE_COLOR = "#3b82f6";
-export const DIRECT_COLOR = "#10b981";
-export const SYSTEM_COLOR = "#6366f1";
+export const DEFAULT_PROFILE_COLOR = "#00add8"; // Official Go Gopher Blue (#00ADD8, rgb(0, 173, 216))
+export const DIRECT_COLOR = "#34d399";          // soft mint emerald green
+export const SYSTEM_COLOR = "#818cf8";          // soft pastel indigo purple
 
 export interface RGB {
   r: number;
@@ -27,11 +27,11 @@ export interface AnyProxyProfile {
 
 /**
  * Parses a hex color string (#RGB or #RRGGBB) into RGB components.
- * Returns default blue if invalid.
+ * Returns Go Gopher blue if invalid.
  */
 export function hexToRgb(hex?: string): RGB {
   if (!hex || typeof hex !== "string") {
-    return { r: 59, g: 130, b: 246 }; // #3b82f6
+    return { r: 0, g: 173, b: 216 }; // #00ADD8 (Go Gopher Blue)
   }
   let clean = hex.trim();
   if (clean.startsWith("#")) clean = clean.slice(1);
@@ -39,7 +39,7 @@ export function hexToRgb(hex?: string): RGB {
     clean = clean.split("").map((c) => c + c).join("");
   }
   if (!/^[0-9a-fA-F]{6}$/.test(clean)) {
-    return { r: 59, g: 130, b: 246 };
+    return { r: 0, g: 173, b: 216 };
   }
   return {
     r: parseInt(clean.slice(0, 2), 16),
@@ -73,22 +73,11 @@ export function resolveProfileColor(profile?: AnyProxyProfile | Partial<ProxyPro
 }
 
 /**
- * Derives a short, concise 2-4 char indicator badge text for the proxy profile.
+ * Derives a short, concise indicator badge text for the proxy profile.
+ * Intentionally returns empty string ("") to keep the icon uncluttered without unnecessary text.
  */
-export function deriveProfileBadgeText(profile?: AnyProxyProfile | Partial<ProxyProfile> | null): string {
-  if (!profile || profile.mode === "direct" || profile.id === "direct") return "DIR";
-  if (profile.mode === "system" || profile.id === "system") return "SYS";
-  if (profile.mode === "pac_script" || profile.isVproxy) return "PAC";
-  if (profile.mode === "fixed_servers") {
-    if (profile.scheme === "socks5") return "S5";
-    if (profile.scheme === "http" || profile.scheme === "https") return "HTTP";
-    return "PRX";
-  }
-  if (profile.name) {
-    const clean = profile.name.trim().replace(/[^a-zA-Z0-9]/g, "");
-    if (clean.length >= 2) return clean.slice(0, 3).toUpperCase();
-  }
-  return "PRX";
+export function deriveProfileBadgeText(_profile?: AnyProxyProfile | Partial<ProxyProfile> | null): string {
+  return "";
 }
 
 /**
@@ -119,14 +108,19 @@ export interface PixelBuffer {
 
 /**
  * Generates dynamic RGBA icon pixel data for a given size and target profile color.
- * Draws a modern, elegant gear/shield icon with an accent border and colored center dot.
+ * Draws a clean, vibrant badge with:
+ * - Outer bold ring: profile color (e.g. Go Gopher blue #00ADD8, emerald #34d399)
+ * - Middle solid ring: pure bright white (#ffffff) with no dark gap rings
+ * - Inner core dot: profile color
+ * - Outside boundary: clean transparent
  */
 export function createProfileIconPixelData(size: number, colorHex: string): PixelBuffer {
   const data = new Uint8ClampedArray(size * size * 4);
   const rgb = hexToRgb(colorHex);
   const center = size / 2;
-  const radius = size / 2 - 1;
-  const innerRadius = size >= 32 ? 6 : 3;
+  const radius = size / 2 - 0.8;
+  const ringInner = size >= 32 ? 9.5 : 4.6;
+  const dotRadius = size >= 32 ? 4.5 : 2.0;
 
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
@@ -136,20 +130,25 @@ export function createProfileIconPixelData(size: number, colorHex: string): Pixe
       const dist = Math.sqrt(dx * dx + dy * dy);
 
       if (dist <= radius) {
-        // Base dark circular background (navy blue/slate theme matching Domour #1e1e2e)
-        let r = 30;
-        let g = 30;
-        let b = 46;
+        let r = rgb.r;
+        let g = rgb.g;
+        let b = rgb.b;
         let a = 255;
 
-        // Outer ring accent (profile color)
-        if (dist >= radius - (size >= 32 ? 3 : 1.5)) {
+        if (dist >= ringInner) {
+          // 1. Outer accent ring (profile color: Go Gopher blue, etc.)
           r = rgb.r;
           g = rgb.g;
           b = rgb.b;
-          a = 230;
-        } else if (dist <= innerRadius) {
-          // Center status dot (solid profile color)
+          a = 255;
+        } else if (dist > dotRadius) {
+          // 2. Middle ring: pure bright solid white (no dark gaps)
+          r = 255;
+          g = 255;
+          b = 255;
+          a = 255;
+        } else {
+          // 3. Center status core dot (profile color)
           r = rgb.r;
           g = rgb.g;
           b = rgb.b;
@@ -161,7 +160,7 @@ export function createProfileIconPixelData(size: number, colorHex: string): Pixe
         data[idx + 2] = b;
         data[idx + 3] = a;
       } else {
-        // Transparent outside circular badge
+        // Transparent outside circular boundary
         data[idx] = 0;
         data[idx + 1] = 0;
         data[idx + 2] = 0;

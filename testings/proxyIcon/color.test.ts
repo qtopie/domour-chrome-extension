@@ -19,13 +19,13 @@ function check(name: string, cond: boolean, detail?: string) {
 console.log("TestProxyIcon_ResolveColor (SPEC-PI-001)");
 
 // Null / undefined profile
-check("null profile falls back to direct green", resolveProfileColor(null) === "#10b981");
-check("undefined profile falls back to direct green", resolveProfileColor(undefined) === "#10b981");
+check("null profile falls back to direct green", resolveProfileColor(null) === "#34d399");
+check("undefined profile falls back to direct green", resolveProfileColor(undefined) === "#34d399");
 
 // Built-in profiles without explicit color
-check("direct profile defaults to #10b981", resolveProfileColor({ id: "direct", mode: "direct" }) === "#10b981");
-check("system profile defaults to #6366f1", resolveProfileColor({ id: "system", mode: "system" }) === "#6366f1");
-check("vproxy pac profile defaults to #3b82f6", resolveProfileColor({ id: "vproxy_pac_default", mode: "pac_script" }) === "#3b82f6");
+check("direct profile defaults to #34d399", resolveProfileColor({ id: "direct", mode: "direct" }) === "#34d399");
+check("system profile defaults to #818cf8", resolveProfileColor({ id: "system", mode: "system" }) === "#818cf8");
+check("vproxy pac profile defaults to #00add8", resolveProfileColor({ id: "vproxy_pac_default", mode: "pac_script" }) === "#00add8");
 
 // Custom valid hex colors
 check("custom 6-digit hex color preserved", resolveProfileColor({ color: "#ec4899" }) === "#ec4899");

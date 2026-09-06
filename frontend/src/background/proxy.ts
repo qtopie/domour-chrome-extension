@@ -80,14 +80,14 @@ export const DEFAULT_PROFILES: ProxyProfile[] = [
     id: "direct",
     name: "Direct Connection",
     mode: "direct",
-    color: "#10b981",
+    color: "#34d399",
     updatedAt: Date.now()
   },
   {
     id: "system",
     name: "System Default Proxy",
     mode: "system",
-    color: "#6366f1",
+    color: "#818cf8",
     updatedAt: Date.now()
   },
   {
@@ -96,7 +96,7 @@ export const DEFAULT_PROFILES: ProxyProfile[] = [
     mode: "pac_script",
     pacType: "url",
     pacUrl: "http://127.0.0.1:26888/proxy.pac",
-    color: "#3b82f6",
+    color: "#00add8",
     isVproxy: true,
     updatedAt: Date.now()
   }

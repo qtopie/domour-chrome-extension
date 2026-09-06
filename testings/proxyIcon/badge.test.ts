@@ -17,14 +17,13 @@ function check(name: string, cond: boolean, detail?: string) {
 }
 
 console.log("TestProxyIcon_DeriveBadgeText (SPEC-PI-002)");
-
-check("null profile -> DIR", deriveProfileBadgeText(null) === "DIR");
-check("direct mode -> DIR", deriveProfileBadgeText({ mode: "direct" }) === "DIR");
-check("system mode -> SYS", deriveProfileBadgeText({ mode: "system" }) === "SYS");
-check("pac_script mode -> PAC", deriveProfileBadgeText({ mode: "pac_script" }) === "PAC");
-check("fixed_servers socks5 -> S5", deriveProfileBadgeText({ mode: "fixed_servers", scheme: "socks5" }) === "S5");
-check("fixed_servers http -> HTTP", deriveProfileBadgeText({ mode: "fixed_servers", scheme: "http" }) === "HTTP");
-check("custom name takes first 3 chars", deriveProfileBadgeText({ name: "HongKong" }) === "HON");
+check("null profile -> empty", deriveProfileBadgeText(null) === "");
+check("direct mode -> empty", deriveProfileBadgeText({ mode: "direct" }) === "");
+check("system mode -> empty", deriveProfileBadgeText({ mode: "system" }) === "");
+check("pac_script mode -> empty", deriveProfileBadgeText({ mode: "pac_script" }) === "");
+check("fixed_servers socks5 -> empty", deriveProfileBadgeText({ mode: "fixed_servers", scheme: "socks5" }) === "");
+check("fixed_servers http -> empty", deriveProfileBadgeText({ mode: "fixed_servers", scheme: "http" }) === "");
+check("custom name -> empty", deriveProfileBadgeText({ name: "HongKong" }) === "");
 
 console.log("TestProxyIcon_DeriveActionTitle (SPEC-PI-003)");
 

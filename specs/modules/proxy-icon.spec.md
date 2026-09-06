@@ -23,10 +23,10 @@ Currently:
 3. If notifications badge text is not active, the toolbar provides zero feedback about the current proxy mode/profile.
 
 ### Objectives:
-- Provide dual-layer visual feedback:
-  1. **Badge Color & Label Indicator:** Set `chrome.action.setBadgeBackgroundColor({ color })` matching the active profile's color. When no notifications are pending, show a compact profile badge text indicator (e.g. `DIR` for direct, `SYS` for system, `PAC` for PAC/vproxy, or the first 2-3 uppercase letters of the profile name/scheme).
-  2. **Dynamic Colored Icon via OffscreenCanvas / ImageData:** Dynamically generate toolbar icon pixels with a colored ring or status indicator matching the profile color, updating via `chrome.action.setIcon({ imageData })`.
-  3. **Preserve Notification Priority:** If an unread notification or alert exists, the notification badge count and red alert color take precedence while unread, but the extension icon or restored badge safely reverts to the proxy profile indicator once notifications are cleared.
+- Provide clean visual feedback:
+  1. **Toolbar Dynamic Colored Icon & Clean Badge:** Dynamically generate toolbar icon pixels with a colored ring and status dot matching the profile color (`chrome.action.setIcon`). Do NOT display extra abbreviation text on the toolbar icon/badge by default to keep the icon uncluttered.
+  2. **Preserve Notification Priority:** When notifications or alerts exist, badge text displays unread count with an alert badge color; when no notifications exist, badge text remains empty (`""`).
+  3. **Hover Tooltip Details:** The full profile name and proxy mode remain accessible on hover via `chrome.action.setTitle`.
 
 ---
 
@@ -96,13 +96,13 @@ export async function updateToolbarIconForProfile(
 #### Scenario 1: [SPEC-PI-001] Resolves canonical color for built-in and custom profiles
 - **Given** A proxy profile with `color` specified or missing
 - **When** `resolveProfileColor(profile)` is called
-- **Then** It returns `#10b981` for direct, `#6366f1` for system, `#3b82f6` for default vproxy PAC, and user-defined `#RRGGBB` for custom profiles, falling back to `#3b82f6` for invalid formats.
+- **Then** It returns `#34d399` for direct (soft emerald/mint green), `#818cf8` for system (soft pastel indigo/purple), `#00add8` for default vproxy PAC (Go Gopher blue #00ADD8), and user-defined `#RRGGBB` for custom profiles, falling back to `#00add8` for invalid formats.
 - **Mapped Test:** `testings/proxyIcon/color.test.ts:TestProxyIcon_ResolveColor`
 
 #### Scenario 2: [SPEC-PI-002] Derives concise badge text for proxy modes
 - **Given** Profiles with modes `direct`, `system`, `pac_script`, and `fixed_servers`
 - **When** `deriveProfileBadgeText(profile)` is evaluated
-- **Then** It yields `"DIR"` for direct, `"SYS"` for system, `"PAC"` for pac_script, `"S5"` for socks5, `"HTTP"` for http, and non-empty max-3-character text for custom names.
+- **Then** It yields `""` (empty string) to prevent text clutter on the toolbar icon.
 - **Mapped Test:** `testings/proxyIcon/badge.test.ts:TestProxyIcon_DeriveBadgeText`
 
 #### Scenario 3: [SPEC-PI-003] Derives descriptive action title
@@ -120,11 +120,11 @@ export async function updateToolbarIconForProfile(
 #### Scenario 5: [SPEC-PI-005] Updates toolbar icon and badge when proxy switches
 - **Given** Active proxy switches from "direct" to a SOCKS5 profile or PAC profile
 - **When** `applyProxyConfig` succeeds or `SET_ACTIVE_PROXY` executes
-- **Then** `updateToolbarIconForProfile` updates the toolbar badge background color and icon to match the new profile's color.
+- **Then** `updateToolbarIconForProfile` updates the toolbar icon to match the new profile's color without adding text on the badge.
 - **Mapped Test:** `testings/proxyIcon/integration.test.ts:TestProxyIcon_UpdateToolbar`
 
 #### Scenario 6: [SPEC-PI-006] Preserves notification badge precedence
 - **Given** An active notification exists with pending alert count
 - **When** Proxy profile is updated while notifications are enabled and unread
-- **Then** The notification badge count and alert color are preserved, and when notifications are cleared, the profile badge indicator is restored.
+- **Then** The notification badge count and alert color are preserved, and when notifications are cleared, the badge text is cleared back to empty.
 - **Mapped Test:** `testings/proxyIcon/integration.test.ts:TestProxyIcon_NotificationPrecedence`

@@ -37,6 +37,7 @@ for (const size of [16, 32]) {
 
   // Check that the buffer has colored pixels with alpha > 0
   let hasProfileColor = false;
+  let hasWhiteRing = false;
   for (let i = 0; i < pixelResult.data.length; i += 4) {
     const r = pixelResult.data[i];
     const g = pixelResult.data[i + 1];
@@ -45,10 +46,13 @@ for (const size of [16, 32]) {
 
     if (a > 0 && r === 0x10 && g === 0xb9 && b === 0x81) {
       hasProfileColor = true;
-      break;
+    }
+    if (a > 0 && r === 255 && g === 255 && b === 255) {
+      hasWhiteRing = true;
     }
   }
   check(`size ${size} contains target profile color pixels`, hasProfileColor);
+  check(`size ${size} contains white middle highlight ring pixels`, hasWhiteRing);
 }
 
 console.log(failures === 0 ? "\nAll icon tests passed ✅" : `\n${failures} FAILURE(S) ❌`);

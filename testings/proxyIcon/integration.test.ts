@@ -41,12 +41,12 @@ function mockApplyVisual(profile: any, hasPendingNotification: boolean) {
 }
 
 mockApplyVisual({ id: "direct", mode: "direct", name: "Direct Connection" }, false);
-check("direct sets green badge color", mockBadgeColor === "#10b981");
-check("direct sets DIR badge text", mockBadgeText === "DIR");
+check("direct sets green badge color", mockBadgeColor === "#34d399");
+check("direct sets empty badge text", mockBadgeText === "");
 
 mockApplyVisual({ id: "vproxy", mode: "pac_script", name: "vproxy Auto PAC" }, false);
-check("vproxy sets blue badge color", mockBadgeColor === "#3b82f6");
-check("vproxy sets PAC badge text", mockBadgeText === "PAC");
+check("vproxy sets blue badge color", mockBadgeColor === "#00add8");
+check("vproxy sets empty badge text", mockBadgeText === "");
 
 console.log("TestProxyIcon_NotificationPrecedence (SPEC-PI-006)");
 
@@ -59,8 +59,8 @@ check("pending notification badge color not overwritten", mockBadgeColor === "#e
 
 // When notification is cleared
 mockApplyVisual({ id: "system", mode: "system" }, false);
-check("clearing notification restores profile badge text", mockBadgeText === "SYS");
-check("clearing notification restores profile badge color", mockBadgeColor === "#6366f1");
+check("clearing notification restores empty badge text", mockBadgeText === "");
+check("clearing notification restores profile badge color", mockBadgeColor === "#818cf8");
 
 console.log(failures === 0 ? "\nAll integration tests passed ✅" : `\n${failures} FAILURE(S) ❌`);
 process.exit(failures === 0 ? 0 : 1);
