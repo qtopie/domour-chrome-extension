@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -81,13 +83,147 @@ type CallToolParams struct {
 }
 
 var (
-	validToken       string
-	tokenLock        sync.RWMutex
-	writeMu          sync.Mutex
-	logFile          *os.File
-	pendingResponseMu sync.Mutex
+	validToken          string
+	tokenLock           sync.RWMutex
+	writeMu             sync.Mutex
+	logFile             *os.File
+	pendingResponseMu   sync.Mutex
 	pendingResponseChan chan ChromeMessage
+
+	upstreamCacheMu           sync.Mutex
+	cachedUpstreamResult      string
+	cachedUpstreamExpires     time.Time
+	cachedUpstreamFingerprint string
 )
+
+type upstreamProbeResult struct {
+	pacDirective string
+	latency      time.Duration
+	ok           bool
+}
+
+func probeUpstream(upStr string, timeout time.Duration) upstreamProbeResult {
+	idx := strings.Index(upStr, "://")
+	if idx == -1 {
+		return upstreamProbeResult{ok: false}
+	}
+	scheme := strings.ToUpper(upStr[:idx])
+	addr := upStr[idx+3:]
+
+	var pacDirective string
+	if scheme == "SOCKS5" || scheme == "SOCKS" {
+		pacDirective = fmt.Sprintf("SOCKS5 %s; SOCKS %s", addr, addr)
+	} else if scheme == "HTTP" || scheme == "HTTPS" {
+		pacDirective = fmt.Sprintf("PROXY %s", addr)
+	} else {
+		return upstreamProbeResult{ok: false}
+	}
+
+	start := time.Now()
+	conn, err := net.DialTimeout("tcp", addr, timeout)
+	if err != nil {
+		return upstreamProbeResult{
+			pacDirective: pacDirective,
+			ok:           false,
+		}
+	}
+	defer conn.Close()
+
+	_ = conn.SetDeadline(time.Now().Add(timeout))
+
+	if scheme == "SOCKS5" || scheme == "SOCKS" {
+		// SOCKS5 greeting: VER=5, NMETHODS=1, METHOD=0 (NO AUTH)
+		if _, err := conn.Write([]byte{0x05, 0x01, 0x00}); err != nil {
+			return upstreamProbeResult{pacDirective: pacDirective, ok: false}
+		}
+		resp := make([]byte, 2)
+		if _, err := io.ReadFull(conn, resp); err != nil || resp[0] != 0x05 {
+			// Fall back to accepting TCP connection if SOCKS5 handshake doesn't respond 0x05
+			// (some servers might be pure TCP tunnel / SOCKS4)
+		}
+	} else if scheme == "HTTP" || scheme == "HTTPS" {
+		if _, err := conn.Write([]byte("HEAD / HTTP/1.0\r\n\r\n")); err != nil {
+			return upstreamProbeResult{pacDirective: pacDirective, ok: false}
+		}
+		buf := make([]byte, 4)
+		_, _ = conn.Read(buf)
+	}
+
+	return upstreamProbeResult{
+		pacDirective: pacDirective,
+		latency:      time.Since(start),
+		ok:           true,
+	}
+}
+
+func resolveSortedUpstreamString(upstreams []string, timeout time.Duration) string {
+	if len(upstreams) == 0 {
+		return ""
+	}
+
+	var wg sync.WaitGroup
+	results := make([]upstreamProbeResult, len(upstreams))
+
+	for i, up := range upstreams {
+		wg.Add(1)
+		go func(idx int, target string) {
+			defer wg.Done()
+			results[idx] = probeUpstream(target, timeout)
+		}(i, up)
+	}
+	wg.Wait()
+
+	var liveResults []upstreamProbeResult
+	var allDirectives []string
+
+	for _, r := range results {
+		if r.pacDirective != "" {
+			allDirectives = append(allDirectives, r.pacDirective)
+		}
+		if r.ok {
+			liveResults = append(liveResults, r)
+		}
+	}
+
+	// If at least one is alive, sort live ones by latency ascending
+	if len(liveResults) > 0 {
+		sort.Slice(liveResults, func(i, j int) bool {
+			return liveResults[i].latency < liveResults[j].latency
+		})
+		var pacList []string
+		for _, lr := range liveResults {
+			pacList = append(pacList, lr.pacDirective)
+		}
+		return strings.Join(pacList, "; ")
+	}
+
+	// Fallback to all configured upstreams in raw order if all probes failed
+	if len(allDirectives) > 0 {
+		return strings.Join(allDirectives, "; ")
+	}
+	return ""
+}
+
+func getCachedOrProbeUpstreams(upstreams []string, fingerprint string) string {
+	upstreamCacheMu.Lock()
+	if time.Now().Before(cachedUpstreamExpires) && cachedUpstreamFingerprint == fingerprint && cachedUpstreamResult != "" {
+		res := cachedUpstreamResult
+		upstreamCacheMu.Unlock()
+		return res
+	}
+	upstreamCacheMu.Unlock()
+
+	// Perform probe with 800ms timeout per upstream
+	sorted := resolveSortedUpstreamString(upstreams, 800*time.Millisecond)
+
+	upstreamCacheMu.Lock()
+	cachedUpstreamResult = sorted
+	cachedUpstreamFingerprint = fingerprint
+	cachedUpstreamExpires = time.Now().Add(15 * time.Second)
+	upstreamCacheMu.Unlock()
+
+	return sorted
+}
 
 func main() {
 	pendingResponseChan = make(chan ChromeMessage, 10)
@@ -282,13 +418,16 @@ func startEmbeddedMCPServer(port int) {
 
 		defaultUpstream := "SOCKS5 192.168.50.31:1080; SOCKS5 192.168.50.189:1080; SOCKS5 127.0.0.1:1080"
 		defaultDomains := []string{
-			"google.com", "gstatic.com", "googleapis.com", "1e100.net", "gmail.com",
-			"googleusercontent.com", "youtube.com", "youtu.be", "ggpht.com", "ytimg.com",
-			"googlevideo.com", "wikimedia.org", "live.com", "githubusercontent.com", "github.com",
+			"google.com", "google", "google.dev", "google.com.hk",
+			"gstatic.com", "googleapis.com", "googleusercontent.com",
+			"youtube.com", "youtu.be", "ytimg.com", "googlevideo.com",
+			"github.com", "githubusercontent.com", "wikipedia.org",
+			"live.com", "golang.org", "1e100.net", "gmail.com", "wikimedia.org",
 		}
 
 		proxyString := defaultUpstream
-		var directDomains, proxyDomains []string
+		var directDomains []string
+		proxyDomains := append([]string{}, defaultDomains...)
 		finalAction := ""
 
 		if cfgData, err := os.ReadFile(vproxyCfgPath); err == nil {
@@ -297,22 +436,11 @@ func startEmbeddedMCPServer(port int) {
 				Rules     []string `json:"rules"`
 			}
 			if err := json.Unmarshal(cfgData, &cfg); err == nil {
-				// 1. Dynamic Upstreams
-				var pacProxies []string
-				for _, up := range cfg.Upstreams {
-					upStr := up
-					if idx := strings.Index(upStr, "://"); idx != -1 {
-						scheme := strings.ToUpper(upStr[:idx])
-						addr := upStr[idx+3:]
-						if scheme == "SOCKS5" || scheme == "SOCKS" {
-							pacProxies = append(pacProxies, fmt.Sprintf("SOCKS5 %s; SOCKS %s", addr, addr))
-						} else if scheme == "HTTP" || scheme == "HTTPS" {
-							pacProxies = append(pacProxies, fmt.Sprintf("PROXY %s", addr))
-						}
-					}
-				}
-				if len(pacProxies) > 0 {
-					proxyString = strings.Join(pacProxies, "; ")
+				// 1. Dynamic Upstreams with active probe & latency-based sorting
+				fingerprint := strings.Join(cfg.Upstreams, ",")
+				sortedProxies := getCachedOrProbeUpstreams(cfg.Upstreams, fingerprint)
+				if sortedProxies != "" {
+					proxyString = sortedProxies
 				}
 
 				// 2. Dynamic Domain Rules
@@ -337,11 +465,6 @@ func startEmbeddedMCPServer(port int) {
 					case "PROXY":
 						proxyDomains = append(proxyDomains, parts[0])
 					}
-				}
-
-				// If no usable rules were configured, fall back to the default domain list.
-				if len(directDomains) == 0 && len(proxyDomains) == 0 && finalAction == "" {
-					proxyDomains = defaultDomains
 				}
 			}
 		}
