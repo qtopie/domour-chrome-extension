@@ -13,4 +13,7 @@ Mapping between `specs/modules/cdp-devtools-traces.spec.md` scenarios and implem
   - Test / Verification: `main_test.go::TestInstantCompleteFallbackLogic` and `frontend/src/background/automation.ts` verify that tabs already in `complete` status are immediately resolved without false 30s timeouts.
 - `SPEC-CDP-005`: User Privacy Toggle Gating for Debugger & CDP Tracing
   - Test / Verification: `frontend/src/background/automation.ts` validates `allow_cdp_debugger` from `chrome.storage.local` before attaching debugger, returning graceful rejection if disabled.
+- `SPEC-CDP-006`: Runtime Dynamic Toolbar Indicator When Debugger Is Active
+  - Test / Verification: `frontend/src/background/proxyIcon.ts` and `frontend/src/background/automation.ts` set dynamic toolbar badge (e.g. `CDP` / `AUTH`) during active sessions and restore profile badge upon completion.
+
 

@@ -1,4 +1,5 @@
 import { appendLog } from './logger';
+import { setSensitiveActionBadge } from './proxyIcon';
 import { resolveSiteRule, hostFromUrl } from '../types/siteRules';
 import type { SiteRules } from '../types/siteRules';
 
@@ -161,7 +162,9 @@ export function executeAutomationJob(
         }
       } catch (e) {}
 
+      setSensitiveActionBadge(true, "AUTH");
       chrome.cookies.getAll({ domain: domain }, (cookies) => {
+        setSensitiveActionBadge(false);
         if (chrome.runtime.lastError) {
           const errMsg = chrome.runtime.lastError.message;
           appendLog("error", `Failed to fetch cookies: ${errMsg}`);
@@ -229,6 +232,7 @@ export function executeAutomationJob(
       const safeDetach = () => {
         if (!detached) {
           detached = true;
+          setSensitiveActionBadge(false);
           chrome.debugger.detach(target).catch(() => {});
         }
       };
@@ -285,12 +289,14 @@ export function executeAutomationJob(
 
       chrome.debugger.attach(target, "1.3", () => {
         if (chrome.runtime.lastError) {
+          setSensitiveActionBadge(false);
           appendLog("error", `Debugger attach failed: ${chrome.runtime.lastError.message}`);
           sendJobResponse(url, "error", `Debugger attach failed: ${chrome.runtime.lastError.message}`);
           chrome.tabs.remove(tabId).catch(() => {});
           return;
         }
 
+        setSensitiveActionBadge(true, "CDP");
         chrome.debugger.sendCommand(target, "Console.enable", {}).catch(() => {});
         chrome.debugger.sendCommand(target, "Log.enable", {}).catch(() => {});
         chrome.debugger.sendCommand(target, "Runtime.enable", {}).catch(() => {});
@@ -349,6 +355,7 @@ export function executeAutomationJob(
       const safeDetach = () => {
         if (!detached) {
           detached = true;
+          setSensitiveActionBadge(false);
           chrome.debugger.detach(target).catch(() => {});
         }
       };
@@ -438,12 +445,14 @@ export function executeAutomationJob(
 
       chrome.debugger.attach(target, "1.3", () => {
         if (chrome.runtime.lastError) {
+          setSensitiveActionBadge(false);
           appendLog("error", `Debugger attach failed for network: ${chrome.runtime.lastError.message}`);
           sendJobResponse(url, "error", `Debugger attach failed: ${chrome.runtime.lastError.message}`);
           chrome.tabs.remove(tabId).catch(() => {});
           return;
         }
 
+        setSensitiveActionBadge(true, "CDP");
         chrome.debugger.sendCommand(target, "Network.enable", {}).catch(() => {});
 
         const checkTabReady = () => {
@@ -688,6 +697,7 @@ export function executeAutomationJob(
         }
         const target = { tabId: tabId };
         const cleanup = () => {
+          setSensitiveActionBadge(false);
           chrome.debugger.detach(target, () => {
             if (chrome.runtime.lastError) { /* ignore */ }
           });
@@ -695,9 +705,11 @@ export function executeAutomationJob(
         const doAttach = () => {
           chrome.debugger.attach(target, "1.3", () => {
             if (chrome.runtime.lastError) {
+              setSensitiveActionBadge(false);
               sendJobResponse(url, "error", `Debugger attach failed: ${chrome.runtime.lastError.message}`);
               return;
             }
+            setSensitiveActionBadge(true, "CDP");
             chrome.debugger.sendCommand(target, "Page.enable", {}).catch(() => {});
             chrome.debugger.sendCommand(target, "Page.setBypassCSP", { enabled: true }).catch(() => {});
             chrome.debugger.sendCommand(target, "Runtime.evaluate", {

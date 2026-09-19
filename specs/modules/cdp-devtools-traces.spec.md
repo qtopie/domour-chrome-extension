@@ -113,3 +113,8 @@ This module adds real-time Chrome DevTools Protocol (CDP) console log collection
 - **When** An agent calls `browser_get_console_logs`, `browser_get_network_logs`, or an `EVALUATE` command requiring CSP bypass
 - **Then** The background worker immediately blocks the action with a user-facing error message `"CDP DevTools debugging disabled by user privacy toggle."` without invoking `chrome.debugger.attach`.
 
+### SPEC-CDP-006: Runtime Dynamic Toolbar Indicator When Debugger Is Active
+- **Given** The agent initiates CDP debugging or sensitive cookie extraction
+- **When** The debugger is actively attached or cookies are being fetched
+- **Then** The extension toolbar displays a vibrant runtime active indicator badge (e.g., `CDP` or `AUTH`), and automatically restores normal badge state upon detach/completion.
+

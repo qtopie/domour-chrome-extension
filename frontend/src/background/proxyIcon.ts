@@ -113,3 +113,35 @@ export function restoreProfileBadge(): void {
     });
   }
 }
+
+/**
+ * Sets a vibrant runtime badge indicator when sensitive operations
+ * (CDP DevTools debugging or Cookie extraction) are in progress.
+ */
+export function setSensitiveActionBadge(
+  active: boolean,
+  type: "CDP" | "AUTH" = "CDP"
+): void {
+  if (typeof chrome === "undefined" || !chrome.action) return;
+
+  if (active) {
+    const color = type === "CDP" ? "#f59e0b" : "#8b5cf6";
+    const text = type === "CDP" ? "CDP" : "AUTH";
+    const title = type === "CDP"
+      ? "Domour Copilot | ⚡ CDP DevTools Debugger Active"
+      : "Domour Copilot | 🔒 Extracting Authenticated Cookies";
+
+    try {
+      chrome.action.setBadgeBackgroundColor({ color });
+      chrome.action.setBadgeText({ text });
+      if (chrome.action.setTitle) {
+        chrome.action.setTitle({ title });
+      }
+    } catch {
+      // ignore
+    }
+  } else {
+    restoreProfileBadge();
+  }
+}
+
