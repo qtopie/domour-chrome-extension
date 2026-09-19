@@ -243,6 +243,7 @@ export const zh: Dict = {
   // ---------- Playwright ----------
   "pw.mcpSnippetDesc": "将以下 JSON 配置到你的 AI 编程助手 MCP 客户端即可连接。",
   "pw.privacyTitle": "隐私与敏感权限管理",
+  "pw.privacyDesc": "集中控制授予 AI 自动化 Agent 的浏览器高风险敏感权限，随时开启或一键禁用。",
   "pw.allowCookiesTitle": "允许 Cookie 凭证提取",
   "pw.allowCookiesDesc": "允许 AI Agent 提取会话 Cookie 凭证以实现已登录状态自动化。",
   "pw.allowDebuggerTitle": "允许 DevTools & CDP 调试追踪",

@@ -5,6 +5,7 @@ import SiteRulesManager from "../SiteRulesManager";
 import NotificationsManager from "../NotificationsManager";
 import RequestsManager from "../RequestsManager";
 import BridgeConfig from "../BridgeConfig";
+import PrivacyManager from "../PrivacyManager";
 import TrafficAnalysisManager from "../TrafficAnalysisManager";
 import { OPTIONS_TABS } from "./tabs";
 import { useI18n } from "../../i18n/I18nProvider";
@@ -166,6 +167,7 @@ export default function OptionsPage() {
                 </div>
               </div>
             </section>
+            <PrivacyManager isExtension={isExtension} onLogMessage={appendSystemLog} layout="settings" />
             <BridgeConfig
               token={token}
               copiedToken={copiedToken}

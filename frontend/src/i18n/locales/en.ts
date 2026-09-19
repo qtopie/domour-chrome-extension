@@ -243,6 +243,7 @@ export const en: Dict = {
   // ---------- Playwright ----------
   "pw.mcpSnippetDesc": "Paste the following JSON into your AI coding assistant's MCP client to connect.",
   "pw.privacyTitle": "Privacy & Sensitive Permissions",
+  "pw.privacyDesc": "Control high-risk browser permissions granted to AI automation agents anytime.",
   "pw.allowCookiesTitle": "Allow Cookie Extraction",
   "pw.allowCookiesDesc": "Permit AI agents to retrieve authentic session cookies for login bypass.",
   "pw.allowDebuggerTitle": "Allow DevTools & CDP Traces",
