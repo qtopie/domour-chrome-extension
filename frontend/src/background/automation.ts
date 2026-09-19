@@ -178,39 +178,25 @@ export function executeAutomationJob(
 
   if (action === "TAKE_SCREENSHOT") {
     appendLog("job", `Taking screenshot for URL: ${url}`);
-    createTabWithRetry({ url: url, active: true }, (tab) => {
-      if (!tab || !tab.id) {
-        sendJobResponse(url, "error", "Failed to create tab for screenshot");
+    findOrCreateTab(url, (tabId) => {
+      if (!tabId) {
+        sendJobResponse(url, "error", "Failed to find tab for screenshot");
         return;
       }
-      const tabId = tab.id;
-      const windowId = tab.windowId;
-
-      function screenshotListener(updatedTabId: number, changeInfo: any) {
-        if (updatedTabId === tabId && changeInfo.status === "complete") {
-          chrome.tabs.onUpdated.removeListener(screenshotListener);
-          setTimeout(() => {
-            if (windowId !== undefined) {
-              chrome.tabs.captureVisibleTab(windowId, { format: "png" }, (dataUrl) => {
-                if (chrome.runtime.lastError) {
-                  const errMsg = chrome.runtime.lastError.message;
-                  appendLog("error", `Screenshot capture failed: ${errMsg}`);
-                  sendJobResponse(url, "error", errMsg);
-                } else {
-                  appendLog("job", `Successfully captured screenshot for ${url}`);
-                  sendJobResponse(url, "success", JSON.stringify({ dataUrl, url }));
-                }
-                chrome.tabs.remove(tabId).catch(() => {});
-              });
+      chrome.tabs.get(tabId, (tab) => {
+        const windowId = tab?.windowId;
+        setTimeout(() => {
+          chrome.tabs.captureVisibleTab(windowId, { format: "png" }, (dataUrl) => {
+            if (chrome.runtime.lastError) {
+              const errMsg = chrome.runtime.lastError.message;
+              appendLog("error", `Screenshot capture failed: ${errMsg}`);
+              sendJobResponse(url, "error", errMsg);
+            } else {
+              appendLog("job", `Successfully captured screenshot for ${url}`);
+              sendJobResponse(url, "success", JSON.stringify({ dataUrl, url }));
             }
-          }, 1000);
-        }
-      }
-      chrome.tabs.onUpdated.addListener(screenshotListener);
-      chrome.tabs.get(tabId, (currentTab) => {
-        if (currentTab && currentTab.status === "complete") {
-          screenshotListener(tabId, { status: "complete" });
-        }
+          });
+        }, 300);
       });
     });
     return;
@@ -671,33 +657,41 @@ export function executeAutomationJob(
       }
       const target = { tabId: tabId };
       const cleanup = () => {
-        chrome.debugger.detach(target).catch(() => {});
-      };
-      chrome.debugger.attach(target, "1.3", () => {
-        if (chrome.runtime.lastError) {
-          sendJobResponse(url, "error", `Debugger attach failed: ${chrome.runtime.lastError.message}`);
-          return;
-        }
-        chrome.debugger.sendCommand(target, "Page.enable", {}).catch(() => {});
-        chrome.debugger.sendCommand(target, "Page.setBypassCSP", { enabled: true }).catch(() => {});
-        chrome.debugger.sendCommand(target, "Runtime.evaluate", {
-          expression: expr,
-          returnByValue: true,
-          awaitPromise: true,
-          allowUnsafeEvalBlockedByCSP: true,
-          userGesture: true
-        }, (res: any) => {
-          cleanup();
-          if (chrome.runtime.lastError) {
-            sendJobResponse(url, "error", chrome.runtime.lastError.message);
-          } else if (res?.exceptionDetails) {
-            const excMsg = res.exceptionDetails.exception?.description || res.exceptionDetails.text;
-            sendJobResponse(url, "error", excMsg);
-          } else {
-            const val = res?.result?.value;
-            sendJobResponse(url, "success", typeof val === "string" ? val : JSON.stringify(val));
-          }
+        chrome.debugger.detach(target, () => {
+          if (chrome.runtime.lastError) { /* ignore */ }
         });
+      };
+      const doAttach = () => {
+        chrome.debugger.attach(target, "1.3", () => {
+          if (chrome.runtime.lastError) {
+            sendJobResponse(url, "error", `Debugger attach failed: ${chrome.runtime.lastError.message}`);
+            return;
+          }
+          chrome.debugger.sendCommand(target, "Page.enable", {}).catch(() => {});
+          chrome.debugger.sendCommand(target, "Page.setBypassCSP", { enabled: true }).catch(() => {});
+          chrome.debugger.sendCommand(target, "Runtime.evaluate", {
+            expression: expr,
+            returnByValue: true,
+            awaitPromise: true,
+            allowUnsafeEvalBlockedByCSP: true,
+            userGesture: true
+          }, (res: any) => {
+            cleanup();
+            if (chrome.runtime.lastError) {
+              sendJobResponse(url, "error", chrome.runtime.lastError.message);
+            } else if (res?.exceptionDetails) {
+              const excMsg = res.exceptionDetails.exception?.description || res.exceptionDetails.text;
+              sendJobResponse(url, "error", excMsg);
+            } else {
+              const val = res?.result?.value;
+              sendJobResponse(url, "success", typeof val === "string" ? val : JSON.stringify(val));
+            }
+          });
+        });
+      };
+      chrome.debugger.detach(target, () => {
+        if (chrome.runtime.lastError) { /* ignore if not attached */ }
+        doAttach();
       });
     });
     return;
