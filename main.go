@@ -335,6 +335,14 @@ func dispatchJobToBrowser(action, targetURL string, extra ...map[string]string) 
 	log.Printf("Dispatching in-memory job to Chrome: Action=%s, URL=%s", action, targetURL)
 	sendSystemLog("info", "Executing memory MCP job. Action: %s, URL: %s", action, targetURL)
 
+	// Drain any stale messages from pendingResponseChan before sending new job
+	for len(pendingResponseChan) > 0 {
+		select {
+		case <-pendingResponseChan:
+		default:
+		}
+	}
+
 	if err := writeMessage(os.Stdout, payloadBytes); err != nil {
 		return ChromeMessage{}, fmt.Errorf("failed to write message to Chrome pipe: %v", err)
 	}
@@ -742,6 +750,55 @@ func getToolsList() []MCPTool {
 				"required": []string{"url"},
 			},
 		},
+		{
+			Name:        "browser_get_console_logs",
+			Description: "Retrieve browser console logs, warnings, and uncaught exceptions for a target web page via Chrome DevTools Protocol (CDP).",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"url": map[string]interface{}{
+						"type":        "string",
+						"description": "Target Web URL to inspect console logs",
+					},
+					"min_level": map[string]interface{}{
+						"type":        "string",
+						"description": "Optional minimum level to filter ('debug', 'info', 'warn', 'error'). Defaults to 'info'.",
+						"enum":        []string{"debug", "info", "warn", "error"},
+					},
+					"clear": map[string]interface{}{
+						"type":        "boolean",
+						"description": "Optional flag to clear buffered console logs after retrieval.",
+					},
+				},
+				"required": []string{"url"},
+			},
+		},
+		{
+			Name:        "browser_get_network_logs",
+			Description: "Retrieve HTTP/HTTPS network request traces, status codes, failed requests, and timing information via Chrome DevTools Protocol (CDP).",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"url": map[string]interface{}{
+						"type":        "string",
+						"description": "Target Web URL to inspect network traces",
+					},
+					"filter_type": map[string]interface{}{
+						"type":        "string",
+						"description": "Optional filter for resource type ('all', 'xhr', 'fetch', 'document', 'script', 'stylesheet', 'image'). Defaults to 'all'.",
+					},
+					"include_har": map[string]interface{}{
+						"type":        "boolean",
+						"description": "Optional flag to export standard HAR 1.2 format JSON.",
+					},
+					"clear": map[string]interface{}{
+						"type":        "boolean",
+						"description": "Optional flag to clear buffered network traces after retrieval.",
+					},
+				},
+				"required": []string{"url"},
+			},
+		},
 	}
 }
 
@@ -900,6 +957,43 @@ func handleCallTool(params CallToolParams) (interface{}, error) {
 			return nil, fmt.Errorf("missing 'url' argument")
 		}
 		resMsg, err := dispatchJobToBrowser("TAKE_SCREENSHOT", targetURL)
+		if err != nil {
+			return nil, err
+		}
+		return makeRes(resMsg.Data)
+
+	case "browser_get_console_logs":
+		targetURL := strArg("url")
+		if targetURL == "" {
+			return nil, fmt.Errorf("missing 'url' argument")
+		}
+		extra := map[string]string{
+			"min_level": strArg("min_level"),
+		}
+		if clearVal, ok := params.Arguments["clear"].(bool); ok && clearVal {
+			extra["clear"] = "true"
+		}
+		resMsg, err := dispatchJobToBrowser("GET_CONSOLE_LOGS", targetURL, extra)
+		if err != nil {
+			return nil, err
+		}
+		return makeRes(resMsg.Data)
+
+	case "browser_get_network_logs":
+		targetURL := strArg("url")
+		if targetURL == "" {
+			return nil, fmt.Errorf("missing 'url' argument")
+		}
+		extra := map[string]string{
+			"filter_type": strArg("filter_type"),
+		}
+		if harVal, ok := params.Arguments["include_har"].(bool); ok && harVal {
+			extra["include_har"] = "true"
+		}
+		if clearVal, ok := params.Arguments["clear"].(bool); ok && clearVal {
+			extra["clear"] = "true"
+		}
+		resMsg, err := dispatchJobToBrowser("GET_NETWORK_LOGS", targetURL, extra)
 		if err != nil {
 			return nil, err
 		}

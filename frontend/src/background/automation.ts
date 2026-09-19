@@ -145,6 +145,265 @@ export function executeAutomationJob(
         }
       }
       chrome.tabs.onUpdated.addListener(screenshotListener);
+      chrome.tabs.get(tabId, (currentTab) => {
+        if (currentTab && currentTab.status === "complete") {
+          screenshotListener(tabId, { status: "complete" });
+        }
+      });
+    });
+    return;
+  }
+
+  if (action === "GET_CONSOLE_LOGS") {
+    appendLog("job", `Collecting console logs for: ${url}`);
+    const minLevel = ((job.min_level as string) || "info").toLowerCase();
+    const levelOrder: Record<string, number> = { debug: 0, log: 1, info: 1, warn: 2, error: 3 };
+    const threshold = levelOrder[minLevel] ?? 1;
+
+    createTabWithRetry({ url: url, active: true }, (tab) => {
+      if (!tab || !tab.id) {
+        sendJobResponse(url, "error", "Failed to create tab for console logs");
+        return;
+      }
+      const tabId = tab.id;
+      const target = { tabId };
+      const logs: any[] = [];
+
+      let detached = false;
+      const safeDetach = () => {
+        if (!detached) {
+          detached = true;
+          chrome.debugger.detach(target).catch(() => {});
+        }
+      };
+
+      const cdpEventListener = (source: chrome.debugger.Debuggee, method: string, params?: any) => {
+        if (source.tabId !== tabId) return;
+        if (method === "Runtime.consoleAPICalled") {
+          const type = params?.type || "log";
+          const lvl = type === "warning" ? "warn" : type;
+          const entryLevel = levelOrder[lvl] ?? 1;
+          if (entryLevel >= threshold) {
+            const text = (params?.args || []).map((a: any) => a.value !== undefined ? String(a.value) : (a.description || "")).join(" ");
+            const stack = params?.stackTrace?.callFrames?.[0];
+            logs.push({
+              timestamp: params?.timestamp ? Math.round(params.timestamp) : Date.now(),
+              level: lvl,
+              text,
+              url: stack?.url || "",
+              line: stack?.lineNumber || 0,
+            });
+          }
+        } else if (method === "Log.entryAdded") {
+          const entry = params?.entry;
+          const lvl = entry?.level || "info";
+          const entryLevel = levelOrder[lvl] ?? 1;
+          if (entryLevel >= threshold) {
+            logs.push({
+              timestamp: entry?.timestamp ? Math.round(entry.timestamp) : Date.now(),
+              level: lvl,
+              text: entry?.text || "",
+              url: entry?.url || "",
+              line: entry?.lineNumber || 0,
+            });
+          }
+        } else if (method === "Runtime.exceptionThrown") {
+          logs.push({
+            timestamp: params?.timestamp ? Math.round(params.timestamp) : Date.now(),
+            level: "error",
+            text: params?.exceptionDetails?.text || params?.exceptionDetails?.exception?.description || "Uncaught exception",
+            url: params?.exceptionDetails?.url || "",
+            line: params?.exceptionDetails?.lineNumber || 0,
+          });
+        }
+      };
+
+      chrome.debugger.onEvent.addListener(cdpEventListener);
+
+      const finishAndRespond = () => {
+        chrome.debugger.onEvent.removeListener(cdpEventListener);
+        safeDetach();
+        sendJobResponse(url, "success", JSON.stringify(logs));
+        chrome.tabs.remove(tabId).catch(() => {});
+      };
+
+      chrome.debugger.attach(target, "1.3", () => {
+        if (chrome.runtime.lastError) {
+          appendLog("error", `Debugger attach failed: ${chrome.runtime.lastError.message}`);
+          sendJobResponse(url, "error", `Debugger attach failed: ${chrome.runtime.lastError.message}`);
+          chrome.tabs.remove(tabId).catch(() => {});
+          return;
+        }
+
+        chrome.debugger.sendCommand(target, "Console.enable", {}).catch(() => {});
+        chrome.debugger.sendCommand(target, "Log.enable", {}).catch(() => {});
+        chrome.debugger.sendCommand(target, "Runtime.enable", {}).catch(() => {});
+
+        const checkTabReady = () => {
+          setTimeout(finishAndRespond, 2000);
+        };
+
+        function onUpdate(updatedTabId: number, changeInfo: any) {
+          if (updatedTabId === tabId && changeInfo.status === "complete") {
+            chrome.tabs.onUpdated.removeListener(onUpdate);
+            checkTabReady();
+          }
+        }
+        chrome.tabs.onUpdated.addListener(onUpdate);
+        chrome.tabs.get(tabId, (currentTab) => {
+          if (currentTab && currentTab.status === "complete") {
+            chrome.tabs.onUpdated.removeListener(onUpdate);
+            checkTabReady();
+          }
+        });
+
+        setTimeout(() => {
+          chrome.tabs.onUpdated.removeListener(onUpdate);
+          finishAndRespond();
+        }, 12000);
+      });
+    });
+    return;
+  }
+
+  if (action === "GET_NETWORK_LOGS") {
+    appendLog("job", `Collecting network request traces for: ${url}`);
+    const filterType = (((job.filter_type as string) || "all")).toLowerCase();
+    const includeHar = job.include_har === "true" || job.include_har === true;
+
+    createTabWithRetry({ url: url, active: true }, (tab) => {
+      if (!tab || !tab.id) {
+        sendJobResponse(url, "error", "Failed to create tab for network logs");
+        return;
+      }
+      const tabId = tab.id;
+      const target = { tabId };
+      const requestsMap = new Map<string, any>();
+
+      let detached = false;
+      const safeDetach = () => {
+        if (!detached) {
+          detached = true;
+          chrome.debugger.detach(target).catch(() => {});
+        }
+      };
+
+      const cdpNetListener = (source: chrome.debugger.Debuggee, method: string, params?: any) => {
+        if (source.tabId !== tabId || !params) return;
+        const reqId = params.requestId;
+        if (!reqId) return;
+
+        if (method === "Network.requestWillBeSent") {
+          requestsMap.set(reqId, {
+            requestId: reqId,
+            url: params.request?.url || "",
+            method: params.request?.method || "GET",
+            headers: params.request?.headers || {},
+            timestamp: params.timestamp,
+            wallTime: params.wallTime || Date.now() / 1000,
+            type: (params.type || "other").toLowerCase(),
+            status: 0,
+            statusText: "Pending",
+            mimeType: "",
+            durationMs: 0,
+            failed: false,
+          });
+        } else if (method === "Network.responseReceived") {
+          const req = requestsMap.get(reqId);
+          if (req) {
+            req.status = params.response?.status || 0;
+            req.statusText = params.response?.statusText || "OK";
+            req.mimeType = params.response?.mimeType || "";
+            req.responseHeaders = params.response?.headers || {};
+            if (params.timestamp && req.timestamp) {
+              req.durationMs = Math.round((params.timestamp - req.timestamp) * 1000 * 100) / 100;
+            }
+          }
+        } else if (method === "Network.loadingFailed") {
+          const req = requestsMap.get(reqId);
+          if (req) {
+            req.failed = true;
+            req.error = params.errorText || "Failed";
+            if (params.timestamp && req.timestamp) {
+              req.durationMs = Math.round((params.timestamp - req.timestamp) * 1000 * 100) / 100;
+            }
+          }
+        } else if (method === "Network.loadingFinished") {
+          const req = requestsMap.get(reqId);
+          if (req && params.timestamp && req.timestamp && req.durationMs === 0) {
+            req.durationMs = Math.round((params.timestamp - req.timestamp) * 1000 * 100) / 100;
+          }
+        }
+      };
+
+      chrome.debugger.onEvent.addListener(cdpNetListener);
+
+      const finishAndRespond = () => {
+        chrome.debugger.onEvent.removeListener(cdpNetListener);
+        safeDetach();
+
+        const entries = Array.from(requestsMap.values()).filter((item) => {
+          if (filterType === "all") return true;
+          return item.type === filterType;
+        });
+
+        let outputData: any;
+        if (includeHar) {
+          outputData = {
+            log: {
+              version: "1.2",
+              creator: { name: "Domour Copilot Chrome MCP", version: "1.3.1" },
+              pages: [{ startedDateTime: new Date().toISOString(), id: `page_${tabId}`, title: url }],
+              entries: entries.map((r) => ({
+                startedDateTime: new Date(r.wallTime * 1000).toISOString(),
+                time: r.durationMs,
+                request: { method: r.method, url: r.url, headers: Object.entries(r.headers || {}).map(([name, value]) => ({ name, value: String(value) })) },
+                response: { status: r.status, statusText: r.statusText, mimeType: r.mimeType, headers: Object.entries(r.responseHeaders || {}).map(([name, value]) => ({ name, value: String(value) })) },
+                error: r.error,
+              })),
+            },
+          };
+        } else {
+          outputData = entries;
+        }
+
+        sendJobResponse(url, "success", JSON.stringify(outputData));
+        chrome.tabs.remove(tabId).catch(() => {});
+      };
+
+      chrome.debugger.attach(target, "1.3", () => {
+        if (chrome.runtime.lastError) {
+          appendLog("error", `Debugger attach failed for network: ${chrome.runtime.lastError.message}`);
+          sendJobResponse(url, "error", `Debugger attach failed: ${chrome.runtime.lastError.message}`);
+          chrome.tabs.remove(tabId).catch(() => {});
+          return;
+        }
+
+        chrome.debugger.sendCommand(target, "Network.enable", {}).catch(() => {});
+
+        const checkTabReady = () => {
+          setTimeout(finishAndRespond, 2000);
+        };
+
+        function onUpdate(updatedTabId: number, changeInfo: any) {
+          if (updatedTabId === tabId && changeInfo.status === "complete") {
+            chrome.tabs.onUpdated.removeListener(onUpdate);
+            checkTabReady();
+          }
+        }
+        chrome.tabs.onUpdated.addListener(onUpdate);
+        chrome.tabs.get(tabId, (currentTab) => {
+          if (currentTab && currentTab.status === "complete") {
+            chrome.tabs.onUpdated.removeListener(onUpdate);
+            checkTabReady();
+          }
+        });
+
+        setTimeout(() => {
+          chrome.tabs.onUpdated.removeListener(onUpdate);
+          finishAndRespond();
+        }, 12000);
+      });
     });
     return;
   }
@@ -247,6 +506,11 @@ export function executeAutomationJob(
         }
       }
       chrome.tabs.onUpdated.addListener(updateListener);
+      chrome.tabs.get(tabId, (currentTab) => {
+        if (currentTab && currentTab.status === "complete") {
+          updateListener(tabId, { status: "complete" });
+        }
+      });
     });
   };
 
@@ -450,6 +714,11 @@ export function executeAutomationJob(
     }
 
     chrome.tabs.onUpdated.addListener(tabUpdateListener);
+    chrome.tabs.get(tabId, (currentTab) => {
+      if (currentTab && currentTab.status === "complete") {
+        tabUpdateListener(tabId, { status: "complete" });
+      }
+    });
 
     setTimeout(() => {
       chrome.tabs.onUpdated.removeListener(tabUpdateListener);

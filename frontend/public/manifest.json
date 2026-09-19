@@ -12,7 +12,8 @@
     "proxy",
     "nativeMessaging",
     "cookies",
-    "declarativeNetRequest"
+    "declarativeNetRequest",
+    "debugger"
   ],
   "background": {
     "service_worker": "background.js",

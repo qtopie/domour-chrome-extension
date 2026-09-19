@@ -133,3 +133,71 @@ func TestRuleEscapingAndCIDR(t *testing.T) {
 		}
 	}
 }
+
+func TestCDPConsoleLogToolRegistrationAndDispatch(t *testing.T) {
+	tools := getToolsList()
+	var found bool
+	for _, tool := range tools {
+		if tool.Name == "browser_get_console_logs" {
+			found = true
+			if tool.Description == "" {
+				t.Fatalf("browser_get_console_logs missing description")
+			}
+			schema, ok := tool.InputSchema.(map[string]interface{})
+			if !ok {
+				t.Fatalf("browser_get_console_logs schema invalid")
+			}
+			props, ok := schema["properties"].(map[string]interface{})
+			if !ok || props["url"] == nil {
+				t.Fatalf("browser_get_console_logs schema missing 'url' property")
+			}
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("browser_get_console_logs tool not registered in getToolsList()")
+	}
+
+	// Verify missing url returns error
+	_, err := handleCallTool(CallToolParams{
+		Name:      "browser_get_console_logs",
+		Arguments: map[string]interface{}{},
+	})
+	if err == nil || !strings.Contains(err.Error(), "missing 'url'") {
+		t.Fatalf("expected missing url error, got: %v", err)
+	}
+}
+
+func TestCDPNetworkLogToolRegistrationAndDispatch(t *testing.T) {
+	tools := getToolsList()
+	var found bool
+	for _, tool := range tools {
+		if tool.Name == "browser_get_network_logs" {
+			found = true
+			if tool.Description == "" {
+				t.Fatalf("browser_get_network_logs missing description")
+			}
+			schema, ok := tool.InputSchema.(map[string]interface{})
+			if !ok {
+				t.Fatalf("browser_get_network_logs schema invalid")
+			}
+			props, ok := schema["properties"].(map[string]interface{})
+			if !ok || props["url"] == nil {
+				t.Fatalf("browser_get_network_logs schema missing 'url' property")
+			}
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("browser_get_network_logs tool not registered in getToolsList()")
+	}
+
+	// Verify missing url returns error
+	_, err := handleCallTool(CallToolParams{
+		Name:      "browser_get_network_logs",
+		Arguments: map[string]interface{}{},
+	})
+	if err == nil || !strings.Contains(err.Error(), "missing 'url'") {
+		t.Fatalf("expected missing url error, got: %v", err)
+	}
+}
