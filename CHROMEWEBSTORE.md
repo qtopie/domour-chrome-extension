@@ -56,10 +56,12 @@ English
 
 ## Graphics & Assets
 
-| Asset | Dimensions | Status | Filename |
-|-------|-----------|--------|----------|
-| Store Icon [REQUIRED] | 128×128 PNG | ✅ Ready | `frontend/public/icon-128.png` |
-| Screenshot 1 [REQUIRED] | 1280×800 | ✅ Ready | `screenshot_1280x800.png` |
+| Asset | Dimensions | Status | Filename | Description |
+|-------|-----------|--------|----------|-------------|
+| Store Icon [REQUIRED] | 128×128 PNG | ✅ Ready | `frontend/public/icon-128.png` | App Icon |
+| Screenshot 1 [REQUIRED] | 1280×800 24-bit PNG | ✅ Ready | `screenshot_1280x800.png` | Permissions & Privacy Controls (Cookie Extraction & DevTools Traces) |
+| Screenshot 2 [OPTIONAL] | 1280×800 24-bit PNG | ✅ Ready | `screenshot_2_proxy_1280x800.png` | Proxy Profiles & Dynamic PAC Upstream Routing |
+| Screenshot 3 [OPTIONAL] | 1280×800 24-bit PNG | ✅ Ready | `screenshot_3_general_1280x800.png` | General Settings & Native MCP Daemon Bridge |
 
 ---
 
