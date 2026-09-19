@@ -51,6 +51,60 @@ function createTabWithRetry(
   tryCreate();
 }
 
+function normalizeCompareUrl(u: string): string {
+  return u
+    .replace(/#.*$/, "")
+    .replace(/\/+$/, "")
+    .replace("://localhost:", "://127.0.0.1:")
+    .replace("://localhost/", "://127.0.0.1/");
+}
+
+function findOrCreateTab(
+  targetUrl: string,
+  callback: (tabId: number, isTemp: boolean) => void
+): void {
+  const normTarget = normalizeCompareUrl(targetUrl);
+  chrome.tabs.query({}, (tabs) => {
+    const existing = tabs.find((t) => {
+      if (!t.id || !t.url) return false;
+      const normT = normalizeCompareUrl(t.url);
+      return normT === normTarget || normT.startsWith(normTarget) || normTarget.startsWith(normT);
+    });
+    if (existing && existing.id) {
+      chrome.tabs.update(existing.id, { active: true }, () => {});
+      callback(existing.id, false);
+      return;
+    }
+    createTabWithRetry({ url: targetUrl, active: true }, (tab) => {
+      if (!tab || !tab.id) {
+        callback(0, false);
+        return;
+      }
+      const tabId = tab.id;
+      let resolved = false;
+      const done = () => {
+        if (!resolved) {
+          resolved = true;
+          chrome.tabs.onUpdated.removeListener(listener);
+          callback(tabId, false);
+        }
+      };
+      const listener = (updatedTabId: number, changeInfo: any) => {
+        if (updatedTabId === tabId && changeInfo.status === "complete") {
+          done();
+        }
+      };
+      chrome.tabs.onUpdated.addListener(listener);
+      chrome.tabs.get(tabId, (currentTab) => {
+        if (currentTab && currentTab.status === "complete") {
+          done();
+        }
+      });
+      setTimeout(done, 10000);
+    });
+  });
+}
+
 export function executeAutomationJob(
   job: any,
   sendJobResponse: (url: string, status: string, data: any) => void
@@ -82,6 +136,14 @@ export function executeAutomationJob(
   dispatchAutomation();
 
   function dispatchAutomation(): void {
+  if (action === "RELOAD_EXTENSION") {
+    sendJobResponse(url, "success", "Reloading extension");
+    setTimeout(() => {
+      chrome.runtime.reload();
+    }, 100);
+    return;
+  }
+
   if (action === "GET_COOKIES") {
     chrome.storage.local.get(["allow_cookie_extraction"], (res) => {
       const allowed = res.allow_cookie_extraction !== false;
@@ -434,82 +496,69 @@ export function executeAutomationJob(
       sendJobResponse(url, "error", `Cannot execute DOM action on protected URL (chrome://, chrome-extension://, etc): ${url}`);
       return;
     }
-    createTabWithRetry({ url: url, active: true }, (tab) => {
-      if (!tab || !tab.id) {
-        sendJobResponse(url, "error", "Failed to create tab for DOM action");
+    findOrCreateTab(url, (tabId, _isTemp) => {
+      if (!tabId) {
+        sendJobResponse(url, "error", "Failed to find or create tab for DOM action");
         return;
       }
-      const tabId = tab.id;
       const targetSelector = jobOptions.wait_selector || job.wait_selector || job.selector || "";
       const timeoutMs = parseInt(jobOptions.wait_timeout || job.wait_timeout || "8000", 10);
 
-      function updateListener(updatedTabId: number, changeInfo: any) {
-        if (updatedTabId === tabId && changeInfo.status === "complete") {
-          chrome.tabs.onUpdated.removeListener(updateListener);
+      const executeScriptNow = () => {
+        chrome.scripting.executeScript({
+          target: { tabId: tabId },
+          func: scriptFunc as any,
+          args: args
+        }, (results) => {
+          if (chrome.runtime.lastError) {
+            const errMsg = chrome.runtime.lastError.message;
+            appendLog("error", `Script execution failed: ${errMsg}`);
+            sendJobResponse(url, "error", `Script execution failed: ${errMsg}`);
+          } else if (results && results[0]) {
+            const resData = results[0].result;
+            sendJobResponse(url, "success", typeof resData === "string" ? resData : JSON.stringify(resData));
+          } else {
+            sendJobResponse(url, "success", "OK");
+          }
+          // Keep tab open for subsequent automation actions
+        });
+      };
 
-          const executeScriptNow = () => {
-            chrome.scripting.executeScript({
-              target: { tabId: tabId },
-              func: scriptFunc as any,
-              args: args
-            }, (results) => {
-              if (chrome.runtime.lastError) {
-                const errMsg = chrome.runtime.lastError.message;
-                appendLog("error", `Script execution failed: ${errMsg}`);
-                sendJobResponse(url, "error", `Script execution failed: ${errMsg}`);
-              } else if (results && results[0]) {
-                const resData = results[0].result;
-                sendJobResponse(url, "success", typeof resData === "string" ? resData : JSON.stringify(resData));
-              } else {
-                sendJobResponse(url, "success", "OK");
+      // Inject SPA poller to wait for spinner removal
+      chrome.scripting.executeScript({
+        target: { tabId: tabId },
+        func: (waitSel: string, maxWait: number) => {
+          return new Promise((resolve) => {
+            const start = Date.now();
+            const check = () => {
+              const spinner = document.querySelector('.fui-Spinner, [role="progressbar"], .loading-spinner, .spinner');
+              const targetEl = waitSel ? document.querySelector(waitSel) : null;
+              const hasMeaningfulText = document.body && document.body.innerText && document.body.innerText.trim().length > 20 && !document.body.innerText.includes("正在初始化");
+              
+              if (waitSel && targetEl && !spinner) {
+                return resolve({ ready: true, reason: "target_selector_found" });
               }
-              chrome.tabs.remove(tabId).catch(() => {});
-            });
-          };
+              if (!waitSel && !spinner && hasMeaningfulText) {
+                return resolve({ ready: true, reason: "spinner_gone_text_ready" });
+              }
 
-          // Inject SPA poller to wait for spinner removal
-          chrome.scripting.executeScript({
-            target: { tabId: tabId },
-            func: (waitSel: string, maxWait: number) => {
-              return new Promise((resolve) => {
-                const start = Date.now();
-                const check = () => {
-                  const spinner = document.querySelector('.fui-Spinner, [role="progressbar"], .loading-spinner, .spinner');
-                  const targetEl = waitSel ? document.querySelector(waitSel) : null;
-                  const hasMeaningfulText = document.body && document.body.innerText && document.body.innerText.trim().length > 20 && !document.body.innerText.includes("正在初始化");
-                  
-                  if (waitSel && targetEl && !spinner) {
-                    return resolve({ ready: true, reason: "target_selector_found" });
-                  }
-                  if (!waitSel && !spinner && hasMeaningfulText) {
-                    return resolve({ ready: true, reason: "spinner_gone_text_ready" });
-                  }
-
-                  if (Date.now() - start >= maxWait) {
-                    return resolve({ ready: false, reason: "timeout" });
-                  }
-                  setTimeout(check, 150);
-                };
-                check();
-              });
-            },
-            args: [targetSelector, timeoutMs]
-          }, (pollRes) => {
-            const result = (pollRes && pollRes[0]) ? pollRes[0].result : null;
-            if (result && (result as any).ready) {
-              appendLog("job", `SPA ready condition met (${(result as any).reason}). Executing script...`);
-            } else {
-              appendLog("warning", `SPA wait timeout or fallback. Executing script anyway...`);
-            }
-            executeScriptNow();
+              if (Date.now() - start >= maxWait) {
+                return resolve({ ready: false, reason: "timeout" });
+              }
+              setTimeout(check, 150);
+            };
+            check();
           });
+        },
+        args: [targetSelector, timeoutMs]
+      }, (pollRes) => {
+        const result = (pollRes && pollRes[0]) ? pollRes[0].result : null;
+        if (result && (result as any).ready) {
+          appendLog("job", `SPA ready condition met (${(result as any).reason}). Executing script...`);
+        } else {
+          appendLog("warning", `SPA wait timeout or fallback. Executing script anyway...`);
         }
-      }
-      chrome.tabs.onUpdated.addListener(updateListener);
-      chrome.tabs.get(tabId, (currentTab) => {
-        if (currentTab && currentTab.status === "complete") {
-          updateListener(tabId, { status: "complete" });
-        }
+        executeScriptNow();
       });
     });
   };
@@ -534,10 +583,16 @@ export function executeAutomationJob(
     const selector = job.selector || "";
     const textVal = action === "TYPE_TEXT" ? (job.text || "") : (job.value || "");
     runDomScript((sel: string, val: string) => {
-      const el = document.querySelector(sel) as HTMLInputElement | null;
+      const el = document.querySelector(sel) as HTMLInputElement | HTMLTextAreaElement | null;
       if (!el) return `Element not found: ${sel}`;
       el.focus();
-      el.value = val;
+      const proto = el instanceof HTMLTextAreaElement ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
+      const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+      if (setter) {
+        setter.call(el, val);
+      } else {
+        el.value = val;
+      }
       el.dispatchEvent(new Event('input', { bubbles: true }));
       el.dispatchEvent(new Event('change', { bubbles: true }));
       return `Filled value in ${sel}`;
@@ -567,13 +622,15 @@ export function executeAutomationJob(
   }
 
   if (action === "PRESS_KEY") {
-    const selector = job.selector || "body";
+    const selector = job.selector || "";
     const keyName = job.key || "Enter";
     runDomScript((sel: string, key: string) => {
-      const el = document.querySelector(sel) || document.body;
-      el.dispatchEvent(new KeyboardEvent('keydown', { key: key, bubbles: true }));
-      el.dispatchEvent(new KeyboardEvent('keyup', { key: key, bubbles: true }));
-      return `Pressed key ${key} on ${sel}`;
+      const el = (sel ? document.querySelector(sel) : document.activeElement) || document.body;
+      const eventInit = { key: key, code: key, bubbles: true, cancelable: true };
+      el.dispatchEvent(new KeyboardEvent('keydown', eventInit));
+      el.dispatchEvent(new KeyboardEvent('keypress', eventInit));
+      el.dispatchEvent(new KeyboardEvent('keyup', eventInit));
+      return `Pressed key ${key} on ${sel || "activeElement"}`;
     }, [selector, keyName]);
     return;
   }
@@ -607,15 +664,42 @@ export function executeAutomationJob(
 
   if (action === "EVALUATE_JS") {
     const expr = job.expression || "";
-    runDomScript((code: string) => {
-      try {
-        const fn = new Function('"use strict"; return (' + code + ')');
-        const result = fn();
-        return { success: true, result: String(result) };
-      } catch (err) {
-        return { success: false, error: String(err) };
+    findOrCreateTab(url, (tabId, _isTemp) => {
+      if (!tabId) {
+        sendJobResponse(url, "error", "Failed to find or create tab");
+        return;
       }
-    }, [expr]);
+      const target = { tabId: tabId };
+      const cleanup = () => {
+        chrome.debugger.detach(target).catch(() => {});
+      };
+      chrome.debugger.attach(target, "1.3", () => {
+        if (chrome.runtime.lastError) {
+          sendJobResponse(url, "error", `Debugger attach failed: ${chrome.runtime.lastError.message}`);
+          return;
+        }
+        chrome.debugger.sendCommand(target, "Page.enable", {}).catch(() => {});
+        chrome.debugger.sendCommand(target, "Page.setBypassCSP", { enabled: true }).catch(() => {});
+        chrome.debugger.sendCommand(target, "Runtime.evaluate", {
+          expression: expr,
+          returnByValue: true,
+          awaitPromise: true,
+          allowUnsafeEvalBlockedByCSP: true,
+          userGesture: true
+        }, (res: any) => {
+          cleanup();
+          if (chrome.runtime.lastError) {
+            sendJobResponse(url, "error", chrome.runtime.lastError.message);
+          } else if (res?.exceptionDetails) {
+            const excMsg = res.exceptionDetails.exception?.description || res.exceptionDetails.text;
+            sendJobResponse(url, "error", excMsg);
+          } else {
+            const val = res?.result?.value;
+            sendJobResponse(url, "success", typeof val === "string" ? val : JSON.stringify(val));
+          }
+        });
+      });
+    });
     return;
   }
 
@@ -627,110 +711,76 @@ export function executeAutomationJob(
 
   appendLog("job", `Opening target URL: ${url}`);
 
-  createTabWithRetry({ url: url, active: false }, (tab) => {
-    if (!tab || !tab.id) {
-      appendLog("error", "Failed to create tab for automation.");
-      sendJobResponse(url, "error", "Failed to create tab");
+  findOrCreateTab(url, (tabId, _isTemp) => {
+    if (!tabId) {
+      appendLog("error", "Failed to find or create tab for automation.");
+      sendJobResponse(url, "error", "Failed to find or create tab");
       return;
     }
 
-    const tabId = tab.id;
-    appendLog("job", `Tab created with ID ${tabId}. Waiting for page load 'complete'...`);
+    if (isRestrictedUrl(url)) {
+      chrome.tabs.get(tabId, (tab) => {
+        sendJobResponse(url, "success", JSON.stringify({
+          title: tab?.title || "",
+          url: tab?.url || url,
+          innerText: "",
+          htmlLength: 0,
+          protectedPage: true
+        }));
+      });
+      return;
+    }
 
-    function tabUpdateListener(updatedTabId: number, changeInfo: any) {
-      if (updatedTabId === tabId && changeInfo.status === "complete") {
-        chrome.tabs.onUpdated.removeListener(tabUpdateListener);
-        appendLog("job", `Tab ${tabId} loaded. Polling for SPA render completion...`);
-
-        if (isRestrictedUrl(url)) {
-          // Cannot inject into protected pages; return what the tabs API exposes.
-          appendLog("warning", `Cannot inject scripts into protected URL ${url}; returning basic tab info.`);
-          chrome.tabs.get(tabId, (tab) => {
-            sendJobResponse(url, "success", JSON.stringify({
-              title: tab?.title || "",
-              url: tab?.url || url,
-              innerText: "",
-              htmlLength: 0,
-              protectedPage: true
-            }));
-            chrome.tabs.remove(tabId).catch(() => {});
-          });
+    chrome.scripting.executeScript({
+      target: { tabId: tabId },
+      func: (maxWait: number) => {
+        return new Promise((resolve) => {
+          const start = Date.now();
+          const check = () => {
+            const spinner = document.querySelector('.fui-Spinner, [role="progressbar"], .loading-spinner, .spinner');
+            const hasMeaningfulText = document.body && document.body.innerText && document.body.innerText.trim().length > 20 && !document.body.innerText.includes("正在初始化");
+            if (!spinner && hasMeaningfulText) {
+              return resolve({ ready: true, reason: "content_rendered" });
+            }
+            if (Date.now() - start >= maxWait) {
+              return resolve({ ready: false, reason: "timeout" });
+            }
+            setTimeout(check, 150);
+          };
+          check();
+        });
+      },
+      args: [8000]
+    }, () => {
+      chrome.scripting.executeScript({
+        target: { tabId: tabId },
+        func: () => {
+          return {
+            title: document.title,
+            url: window.location.href,
+            innerText: document.body ? document.body.innerText.substring(0, 10000) : "",
+            htmlLength: document.documentElement ? document.documentElement.innerHTML.length : 0
+          };
+        }
+      }, (results) => {
+        if (chrome.runtime.lastError) {
+          const errMsg = chrome.runtime.lastError.message;
+          appendLog("error", `Script injection failed: ${errMsg}`);
+          sendJobResponse(url, "error", `Script injection failed: ${errMsg}`);
           return;
         }
 
-        chrome.scripting.executeScript({
-          target: { tabId: tabId },
-          func: (maxWait: number) => {
-            return new Promise((resolve) => {
-              const start = Date.now();
-              const check = () => {
-                const spinner = document.querySelector('.fui-Spinner, [role="progressbar"], .loading-spinner, .spinner');
-                const hasMeaningfulText = document.body && document.body.innerText && document.body.innerText.trim().length > 20 && !document.body.innerText.includes("正在初始化");
-                if (!spinner && hasMeaningfulText) {
-                  return resolve({ ready: true, reason: "content_rendered" });
-                }
-                if (Date.now() - start >= maxWait) {
-                  return resolve({ ready: false, reason: "timeout" });
-                }
-                setTimeout(check, 150);
-              };
-              check();
-            });
-          },
-          args: [8000]
-        }, () => {
-          chrome.scripting.executeScript({
-            target: { tabId: tabId },
-            func: () => {
-              return {
-                title: document.title,
-                url: window.location.href,
-                innerText: document.body ? document.body.innerText.substring(0, 10000) : "",
-                htmlLength: document.documentElement ? document.documentElement.innerHTML.length : 0
-              };
-            }
-          }, (results) => {
-            if (chrome.runtime.lastError) {
-              const errMsg = chrome.runtime.lastError.message;
-              appendLog("error", `Script injection failed: ${errMsg}`);
-              sendJobResponse(url, "error", `Script injection failed: ${errMsg}`);
-              chrome.tabs.remove(tabId).catch(() => {});
-              return;
-            }
-
-            if (results && results[0] && results[0].result) {
-              const pageData = results[0].result;
-              appendLog("job", `Scrape complete. Extracted title: "${pageData.title}"`);
-              sendJobResponse(url, "success", JSON.stringify(pageData));
-            } else {
-              appendLog("error", "Scrape failed: returned empty results.");
-              sendJobResponse(url, "error", "Scraped empty results");
-            }
-
-            chrome.tabs.remove(tabId).catch(() => {});
-          });
-        });
-      }
-    }
-
-    chrome.tabs.onUpdated.addListener(tabUpdateListener);
-    chrome.tabs.get(tabId, (currentTab) => {
-      if (currentTab && currentTab.status === "complete") {
-        tabUpdateListener(tabId, { status: "complete" });
-      }
-    });
-
-    setTimeout(() => {
-      chrome.tabs.onUpdated.removeListener(tabUpdateListener);
-      chrome.tabs.get(tabId, (checkTab) => {
-        if (chrome.runtime.lastError) return;
-        if (checkTab && checkTab.status !== "complete") {
-          appendLog("error", `Page load timeout (30s) exceeded for tab ${tabId}.`);
-          sendJobResponse(url, "error", "Page load timeout");
-          chrome.tabs.remove(tabId).catch(() => {});
+        if (results && results[0] && results[0].result) {
+          const pageData = results[0].result;
+          appendLog("job", `Scrape complete. Extracted title: "${pageData.title}"`);
+          sendJobResponse(url, "success", JSON.stringify(pageData));
+        } else {
+          appendLog("error", "Scrape failed: returned empty results.");
+          sendJobResponse(url, "error", "Scraped empty results");
         }
       });
-    }, 30000);
+    });
   });
-  }
 }
+}
+
