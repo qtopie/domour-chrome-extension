@@ -76,12 +76,16 @@ export default function PlaywrightManager({ token, isExtension, onLogMessage }: 
   };
 
   const [allowCookies, setAllowCookies] = useState<boolean>(true);
+  const [allowDebugger, setAllowDebugger] = useState<boolean>(true);
 
   useEffect(() => {
     if (isExtension && typeof chrome !== "undefined" && chrome.storage) {
-      chrome.storage.local.get(["allow_cookie_extraction"], (res: any) => {
+      chrome.storage.local.get(["allow_cookie_extraction", "allow_cdp_debugger"], (res: any) => {
         if (res.allow_cookie_extraction !== undefined) {
           setAllowCookies(res.allow_cookie_extraction);
+        }
+        if (res.allow_cdp_debugger !== undefined) {
+          setAllowDebugger(res.allow_cdp_debugger);
         }
       });
     }
@@ -92,6 +96,15 @@ export default function PlaywrightManager({ token, isExtension, onLogMessage }: 
     if (isExtension && typeof chrome !== "undefined" && chrome.storage) {
       chrome.storage.local.set({ allow_cookie_extraction: enabled }, () => {
         onLogMessage?.("system", `Cookie extraction permission ${enabled ? "ENABLED" : "DISABLED"} by user.`);
+      });
+    }
+  };
+
+  const toggleDebugger = (enabled: boolean) => {
+    setAllowDebugger(enabled);
+    if (isExtension && typeof chrome !== "undefined" && chrome.storage) {
+      chrome.storage.local.set({ allow_cdp_debugger: enabled }, () => {
+        onLogMessage?.("system", `DevTools CDP debugging permission ${enabled ? "ENABLED" : "DISABLED"} by user.`);
       });
     }
   };
@@ -204,13 +217,15 @@ export default function PlaywrightManager({ token, isExtension, onLogMessage }: 
       {/* Privacy & Security Controls Card */}
       <div className="panel-card privacy-card">
         <div className="card-header">
-          <h2 className="card-title">Privacy & Sensitive Permissions</h2>
+          <h2 className="card-title">{t("pw.privacyTitle")}</h2>
         </div>
+
+        {/* Cookie Extraction Toggle */}
         <div className="privacy-toggle-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px' }}>
           <div>
-            <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-main, #f3f4f6)' }}>Allow Cookie Extraction</div>
+            <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-main, #f3f4f6)' }}>{t("pw.allowCookiesTitle")}</div>
             <div style={{ fontSize: '11px', color: 'var(--text-muted, #9ca3af)', marginTop: '2px' }}>
-              Permit AI agents to retrieve authentic session cookies for login bypass.
+              {t("pw.allowCookiesDesc")}
             </div>
           </div>
           <label style={{ position: 'relative', display: 'inline-block', width: '40px', height: '22px', cursor: 'pointer' }}>
@@ -227,6 +242,34 @@ export default function PlaywrightManager({ token, isExtension, onLogMessage }: 
             }}>
               <span style={{
                 position: 'absolute', content: '""', height: '16px', width: '16px', left: allowCookies ? '20px' : '3px', bottom: '3px',
+                backgroundColor: '#ffffff', borderRadius: '50%', transition: '.3s'
+              }} />
+            </span>
+          </label>
+        </div>
+
+        {/* DevTools CDP Traces Toggle */}
+        <div className="privacy-toggle-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-main, #f3f4f6)' }}>{t("pw.allowDebuggerTitle")}</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted, #9ca3af)', marginTop: '2px' }}>
+              {t("pw.allowDebuggerDesc")}
+            </div>
+          </div>
+          <label style={{ position: 'relative', display: 'inline-block', width: '40px', height: '22px', cursor: 'pointer' }}>
+            <input 
+              type="checkbox" 
+              checked={allowDebugger} 
+              onChange={(e) => toggleDebugger(e.target.checked)}
+              style={{ opacity: 0, width: 0, height: 0 }} 
+            />
+            <span style={{
+              position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0,
+              backgroundColor: allowDebugger ? '#10b981' : '#374151',
+              borderRadius: '22px', transition: '.3s'
+            }}>
+              <span style={{
+                position: 'absolute', content: '""', height: '16px', width: '16px', left: allowDebugger ? '20px' : '3px', bottom: '3px',
                 backgroundColor: '#ffffff', borderRadius: '50%', transition: '.3s'
               }} />
             </span>

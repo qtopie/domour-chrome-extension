@@ -107,3 +107,9 @@ This module adds real-time Chrome DevTools Protocol (CDP) console log collection
 - **Given** A target URL on `http://127.0.0.1:8080/` loads instantaneously (< 5ms)
 - **When** `browser_navigate`, `browser_get_console_logs`, or `browser_get_network_logs` is invoked
 - **Then** The tab status is detected as `complete` immediately without waiting for the 30-second fallback timer.
+
+### SPEC-CDP-005: User Privacy Toggle Gating for Debugger & CDP Tracing
+- **Given** The user has toggled off "Allow DevTools & CDP Traces" in the Side Panel UI (`allow_cdp_debugger === false` in `chrome.storage.local`)
+- **When** An agent calls `browser_get_console_logs`, `browser_get_network_logs`, or an `EVALUATE` command requiring CSP bypass
+- **Then** The background worker immediately blocks the action with a user-facing error message `"CDP DevTools debugging disabled by user privacy toggle."` without invoking `chrome.debugger.attach`.
+

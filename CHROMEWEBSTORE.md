@@ -1,8 +1,16 @@
 # Chrome Web Store Listing — Domour Copilot
 
-> Last Updated: 2026-09-06 | Version: 1.3.1
+> Last Updated: 2026-09-19 | Version: 1.3.2
 
 ## Version History
+
+### 1.3.2 (2026-09-19)
+- CDP DevTools Trace & Console Logs: Introduced `browser_get_console_logs` and `browser_get_network_logs` with HAR 1.2 trace export.
+- User Privacy Toggle for Debugger: Added Side Panel UI toggle allowing users to enable or disable DevTools CDP debugging anytime.
+- Strict CSP Bypass: Added CDP Runtime.evaluate fallback to execute automation commands safely on strict CSP pages.
+- Active Upstream Probing & Latency Sorting: Automatic latency sorting and failover routing for proxy upstreams.
+- Localhost & Tab Lifecycle Hardening: Normalized loopback tab resolution and preserved automation tab sessions.
+- Fixed Native Host API token initial handshake on service worker startup.
 
 ### 1.3.1 (2026-09-06)
 - Fix cross-world extension resource mismatch by disabling Vite modulePreload in HTML builds.
@@ -28,7 +36,7 @@ Key Features:
 - Low-Token Vision Screenshots: Native image/png MCP response node for LLM vision models, saving up to 99% of context window tokens.
 - Dynamic PAC Proxy & Header Injection: Auto-syncs with local vproxy configurations, supports SOCKS5 failovers, domain routing, and declarative custom request header overrides.
 - Multi-Language & Fluent UI: Seamless English and Simplified Chinese support with accessible Fluent UI design.
-- Privacy-First Protection: One-click UI toggle to control sensitive cookie extraction permissions.
+- Privacy-First Protection: One-click UI toggles to control sensitive cookie extraction and DevTools CDP debugging permissions.
 
 How to Use:
 1. Load unpacked extension and launch the Side Panel.
@@ -68,6 +76,7 @@ English
 | `storage` | permissions | Required to persist user proxy profiles, API tokens, language preferences, and privacy toggle settings locally. |
 | `proxy` | permissions | Required to apply dynamic PAC proxy routing and LAN bypass rules to Chromium settings. |
 | `declarativeNetRequest` | permissions | Required to inject custom request headers for specified target domains without intercepting response payloads. |
+| `debugger` | permissions | Required to collect DevTools console logs, capture network timing traces (HAR 1.2), and evaluate scripts safely under strict CSP pages during AI automation. Strictly gated behind an explicit user privacy toggle in the Side Panel UI. |
 
 | Host Permission | Type | Justification |
 |-----------------|------|---------------|
@@ -89,8 +98,8 @@ English
 
 ## Pre-Publish Artifact Checklist
 
-- [x] Extension compiled into ZIP: `release/domour-copilot-extension-v1.3.1.zip`
-- [x] Manifest Version 3 verified (`1.3.1`)
+- [x] Extension compiled into ZIP: `release/domour-copilot-extension-v1.3.2.zip`
+- [x] Manifest Version 3 verified (`1.3.2`)
 - [x] All permissions justified in plain English
 - [x] Single purpose declared clearly
 - [x] Pass all automated harness & lint checks (`./scripts/check.sh`)

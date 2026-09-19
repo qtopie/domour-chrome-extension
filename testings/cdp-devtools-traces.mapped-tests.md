@@ -11,3 +11,6 @@ Mapping between `specs/modules/cdp-devtools-traces.spec.md` scenarios and implem
   - Test / Verification: `frontend/src/background/automation.ts` guarantees `chrome.debugger.detach` on job completion, tab removal, or timeout without lingering debugger sessions.
 - `SPEC-CDP-004`: Instant Complete for Localhost Navigation
   - Test / Verification: `main_test.go::TestInstantCompleteFallbackLogic` and `frontend/src/background/automation.ts` verify that tabs already in `complete` status are immediately resolved without false 30s timeouts.
+- `SPEC-CDP-005`: User Privacy Toggle Gating for Debugger & CDP Tracing
+  - Test / Verification: `frontend/src/background/automation.ts` validates `allow_cdp_debugger` from `chrome.storage.local` before attaching debugger, returning graceful rejection if disabled.
+

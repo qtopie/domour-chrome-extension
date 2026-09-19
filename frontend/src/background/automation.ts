@@ -203,16 +203,24 @@ export function executeAutomationJob(
   }
 
   if (action === "GET_CONSOLE_LOGS") {
-    appendLog("job", `Collecting console logs for: ${url}`);
-    const minLevel = ((job.min_level as string) || "info").toLowerCase();
-    const levelOrder: Record<string, number> = { debug: 0, log: 1, info: 1, warn: 2, error: 3 };
-    const threshold = levelOrder[minLevel] ?? 1;
-
-    createTabWithRetry({ url: url, active: true }, (tab) => {
-      if (!tab || !tab.id) {
-        sendJobResponse(url, "error", "Failed to create tab for console logs");
+    chrome.storage.local.get(["allow_cdp_debugger"], (res) => {
+      const allowed = res.allow_cdp_debugger !== false;
+      if (!allowed) {
+        appendLog("warning", `Blocked GET_CONSOLE_LOGS request for ${url}: User has disabled CDP debugger in UI toggle.`);
+        sendJobResponse(url, "error", "CDP DevTools debugging disabled by user privacy toggle.");
         return;
       }
+
+      appendLog("job", `Collecting console logs for: ${url}`);
+      const minLevel = ((job.min_level as string) || "info").toLowerCase();
+      const levelOrder: Record<string, number> = { debug: 0, log: 1, info: 1, warn: 2, error: 3 };
+      const threshold = levelOrder[minLevel] ?? 1;
+
+      createTabWithRetry({ url: url, active: true }, (tab) => {
+        if (!tab || !tab.id) {
+          sendJobResponse(url, "error", "Failed to create tab for console logs");
+          return;
+        }
       const tabId = tab.id;
       const target = { tabId };
       const logs: any[] = [];
@@ -311,19 +319,28 @@ export function executeAutomationJob(
         }, 12000);
       });
     });
+    });
     return;
   }
 
   if (action === "GET_NETWORK_LOGS") {
-    appendLog("job", `Collecting network request traces for: ${url}`);
-    const filterType = (((job.filter_type as string) || "all")).toLowerCase();
-    const includeHar = job.include_har === "true" || job.include_har === true;
-
-    createTabWithRetry({ url: url, active: true }, (tab) => {
-      if (!tab || !tab.id) {
-        sendJobResponse(url, "error", "Failed to create tab for network logs");
+    chrome.storage.local.get(["allow_cdp_debugger"], (res) => {
+      const allowed = res.allow_cdp_debugger !== false;
+      if (!allowed) {
+        appendLog("warning", `Blocked GET_NETWORK_LOGS request for ${url}: User has disabled CDP debugger in UI toggle.`);
+        sendJobResponse(url, "error", "CDP DevTools debugging disabled by user privacy toggle.");
         return;
       }
+
+      appendLog("job", `Collecting network request traces for: ${url}`);
+      const filterType = (((job.filter_type as string) || "all")).toLowerCase();
+      const includeHar = job.include_har === "true" || job.include_har === true;
+
+      createTabWithRetry({ url: url, active: true }, (tab) => {
+        if (!tab || !tab.id) {
+          sendJobResponse(url, "error", "Failed to create tab for network logs");
+          return;
+        }
       const tabId = tab.id;
       const target = { tabId };
       const requestsMap = new Map<string, any>();
@@ -400,7 +417,7 @@ export function executeAutomationJob(
           outputData = {
             log: {
               version: "1.2",
-              creator: { name: "Domour Copilot Chrome MCP", version: "1.3.1" },
+              creator: { name: "Domour Copilot Chrome MCP", version: "1.3.2" },
               pages: [{ startedDateTime: new Date().toISOString(), id: `page_${tabId}`, title: url }],
               entries: entries.map((r) => ({
                 startedDateTime: new Date(r.wallTime * 1000).toISOString(),
@@ -452,6 +469,7 @@ export function executeAutomationJob(
           finishAndRespond();
         }, 12000);
       });
+    });
     });
     return;
   }
@@ -650,48 +668,62 @@ export function executeAutomationJob(
 
   if (action === "EVALUATE_JS") {
     const expr = job.expression || "";
-    findOrCreateTab(url, (tabId, _isTemp) => {
-      if (!tabId) {
-        sendJobResponse(url, "error", "Failed to find or create tab");
+    chrome.storage.local.get(["allow_cdp_debugger"], (res) => {
+      const allowDebugger = res.allow_cdp_debugger !== false;
+      if (!allowDebugger) {
+        runDomScript((expressionStr: string) => {
+          try {
+            return (0, eval)(expressionStr);
+          } catch (e: any) {
+            return `Evaluation error: ${e?.message || String(e)}`;
+          }
+        }, [expr]);
         return;
       }
-      const target = { tabId: tabId };
-      const cleanup = () => {
-        chrome.debugger.detach(target, () => {
-          if (chrome.runtime.lastError) { /* ignore */ }
-        });
-      };
-      const doAttach = () => {
-        chrome.debugger.attach(target, "1.3", () => {
-          if (chrome.runtime.lastError) {
-            sendJobResponse(url, "error", `Debugger attach failed: ${chrome.runtime.lastError.message}`);
-            return;
-          }
-          chrome.debugger.sendCommand(target, "Page.enable", {}).catch(() => {});
-          chrome.debugger.sendCommand(target, "Page.setBypassCSP", { enabled: true }).catch(() => {});
-          chrome.debugger.sendCommand(target, "Runtime.evaluate", {
-            expression: expr,
-            returnByValue: true,
-            awaitPromise: true,
-            allowUnsafeEvalBlockedByCSP: true,
-            userGesture: true
-          }, (res: any) => {
-            cleanup();
-            if (chrome.runtime.lastError) {
-              sendJobResponse(url, "error", chrome.runtime.lastError.message);
-            } else if (res?.exceptionDetails) {
-              const excMsg = res.exceptionDetails.exception?.description || res.exceptionDetails.text;
-              sendJobResponse(url, "error", excMsg);
-            } else {
-              const val = res?.result?.value;
-              sendJobResponse(url, "success", typeof val === "string" ? val : JSON.stringify(val));
-            }
+
+      findOrCreateTab(url, (tabId, _isTemp) => {
+        if (!tabId) {
+          sendJobResponse(url, "error", "Failed to find or create tab");
+          return;
+        }
+        const target = { tabId: tabId };
+        const cleanup = () => {
+          chrome.debugger.detach(target, () => {
+            if (chrome.runtime.lastError) { /* ignore */ }
           });
+        };
+        const doAttach = () => {
+          chrome.debugger.attach(target, "1.3", () => {
+            if (chrome.runtime.lastError) {
+              sendJobResponse(url, "error", `Debugger attach failed: ${chrome.runtime.lastError.message}`);
+              return;
+            }
+            chrome.debugger.sendCommand(target, "Page.enable", {}).catch(() => {});
+            chrome.debugger.sendCommand(target, "Page.setBypassCSP", { enabled: true }).catch(() => {});
+            chrome.debugger.sendCommand(target, "Runtime.evaluate", {
+              expression: expr,
+              returnByValue: true,
+              awaitPromise: true,
+              allowUnsafeEvalBlockedByCSP: true,
+              userGesture: true
+            }, (res: any) => {
+              cleanup();
+              if (chrome.runtime.lastError) {
+                sendJobResponse(url, "error", chrome.runtime.lastError.message);
+              } else if (res?.exceptionDetails) {
+                const excMsg = res.exceptionDetails.exception?.description || res.exceptionDetails.text;
+                sendJobResponse(url, "error", excMsg);
+              } else {
+                const val = res?.result?.value;
+                sendJobResponse(url, "success", typeof val === "string" ? val : JSON.stringify(val));
+              }
+            });
+          });
+        };
+        chrome.debugger.detach(target, () => {
+          if (chrome.runtime.lastError) { /* ignore if not attached */ }
+          doAttach();
         });
-      };
-      chrome.debugger.detach(target, () => {
-        if (chrome.runtime.lastError) { /* ignore if not attached */ }
-        doAttach();
       });
     });
     return;
