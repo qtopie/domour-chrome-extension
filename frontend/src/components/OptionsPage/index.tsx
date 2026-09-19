@@ -167,7 +167,6 @@ export default function OptionsPage() {
                 </div>
               </div>
             </section>
-            <PrivacyManager isExtension={isExtension} onLogMessage={appendSystemLog} layout="settings" />
             <BridgeConfig
               token={token}
               copiedToken={copiedToken}
@@ -184,7 +183,12 @@ export default function OptionsPage() {
         {activeTab === "proxy" && (
           <ProxyManager isExtension={isExtension} onLogMessage={appendSystemLog} />
         )}
-        {activeTab === "siterules" && <SiteRulesManager isExtension={isExtension} />}
+        {activeTab === "siterules" && (
+          <>
+            <PrivacyManager isExtension={isExtension} onLogMessage={appendSystemLog} layout="settings" />
+            <SiteRulesManager isExtension={isExtension} />
+          </>
+        )}
         {activeTab === "requestheaders" && <RequestsManager isExtension={isExtension} />}
         {activeTab === "traffic" && <TrafficAnalysisManager isExtension={isExtension} />}
         {activeTab === "advanced" && (
